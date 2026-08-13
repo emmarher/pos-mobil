@@ -3,6 +3,63 @@
 Todas las fechas son `YYYY-MM-DD`. Formato inspirado en
 [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 
+## [0.2.0] — 2026-08-12 — Tema Glassmorphism + pantallas principales (UI/UX)
+
+### Añadido
+
+- **Design System implementado** (spec `UI_UX_DESIGN.md`):
+  - `constants/theme.ts` reescrito: paleta Indigo `#4648D4` (primary),
+    Esmeralda `#006C49` (success), Ámbar (warning), fondo `#F8F9FF`,
+    neutros teñidos de indigo, dark mode autorizado (no inversión).
+  - Tokens de tipografía (display/micro), espaciado 1-4-9, radios y
+    configuración de blur (glass).
+- **Componentes base** en `src/components/`:
+  - `GlassSurface` (superficie translúcida + borde brillante + sombra),
+    `GlassBackground` (fondo con blobs orgánicos de color),
+    `TopAppBar` (avatar + título + notificación con badge),
+    `BottomNavBar` (Caja/Inventario/Reportes con estado activo y badge de carrito),
+    `SearchInput` (búsqueda glass con debounce), `FilterChip` (categorías),
+    `StatusChip` (En stock / Stock bajo / Agotado — siempre texto + color),
+    `KpiCard` (métrica con tendencia y variante de alerta),
+    `ProductCard` (grid del catálogo con precio destacado),
+    `Fab` (carrito con badge numérico / agregar).
+- **Pantallas**:
+  - `PosTerminalScreen` (Caja): búsqueda global, chips de categoría,
+    catálogo grid 2 columnas, FAB carrito con badge, estados vacío/agotado.
+  - `InventoryScreen` (Inventario): KPIs (total/agotados/categorías),
+    lista de catálogo con StatusChip, FAB "+".
+  - `CashierCutScreen` (Corte de caja): comparativo hoy vs. ayer,
+    reconciliación esperado/contado con faltante/sobrante, desglose por método.
+  - `ReceiptScreen` (Recibo digital): ticket emulado con metadatos, ítems,
+    subtotal/IVA/TOTAL en indigo 900, QR placeholder y borde zig-zag.
+  - `ReportsScreen` (Reportes): vista previa de métricas (placeholder).
+- **Dashboard refactorizado**: contenedor de pestañas (Caja/Inventario/Reportes)
+  con estado centralizado; cada pantalla renderiza su `BottomNavBar`.
+- **Login rediseñado** (spec 4.1): logo, "ID de operador" + PIN, botón
+  "Autenticar →", enlace de ayuda; mantiene el `POST /auth/login` real.
+- `ConnectionScreen` y `LicenseBlockScreen` migradas al fondo glass.
+- **Datos mock** en `constants/mock-data.ts` (catálogo, inventario, corte,
+  ticket) hasta conectar la API real (Fases 3-5).
+
+### Corregido
+
+- **Test de App reparado**: `act` no existe en la compilación de React 19
+  de RN 0.84 (ni en react-test-renderer 19.2.3); el test usa un shim que
+  ejecuta el callback. `npm test` vuelve a dar 1/1 PASS.
+
+### Verificado
+
+- `tsc --noEmit` 0 errores · `npm run lint` 0 errores (8 warnings de inline
+  styles, consistentes con el estilo previo) · `npm test` 1/1 PASS.
+
+### Pendiente
+
+- **Fase 3**: login contra servidor real (endpoints tipados, falta probar contra pos-server).
+- **Fase 4**: conexión del catálogo/terminal a `GET /products`; carrito real (Zustand, RF-VE-001).
+- **Fase 5**: `POST /sales`, impresión delegada (polling 2s), báscula (heartbeat 500ms), QoS.
+- Blur real con `@react-native-community/blur` (GlassSurface ya deja el contrato).
+
+
 ## [0.1.0] — 2026-08-11 — Fase 0 y 1 (bases + hello world)
 
 ### Añadido

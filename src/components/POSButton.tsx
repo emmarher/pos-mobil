@@ -52,7 +52,7 @@ export default function POSButton({
   // Mapa variante → colores de fondo y texto (ghost además usa borde)
   const variantColors = {
     primary: {bg: colors.primary, fg: colors.onPrimary},
-    secondary: {bg: colors.secondary, fg: colors.background},
+    secondary: {bg: colors.surface, fg: colors.text, border: colors.border},
     danger: {bg: colors.danger, fg: colors.onPrimary},
     success: {bg: colors.success, fg: colors.onPrimary},
     ghost: {bg: 'transparent', fg: colors.primary, border: colors.border},

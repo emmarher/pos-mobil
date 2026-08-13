@@ -6,14 +6,14 @@
  *   - Licencia vencida → bloqueo TOTAL de la app.
  *   - Solo muestra: "Licencia vencida. Contacte a soporte."
  *   - No permite ninguna operación (sin botones de escape).
+ * Rediseñada con estética glass (fondo + tarjeta).
  * ────────────────────────────────────────────────────────────────────────
- *
- * Secciones:
- *   1) Render (UI) — única sección: mensaje de bloqueo centrado
  */
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 
+import GlassBackground from '../components/GlassBackground';
+import GlassSurface from '../components/GlassSurface';
 import {useTheme} from '../hooks/useTheme';
 
 export default function LicenseBlockScreen() {
@@ -23,24 +23,23 @@ export default function LicenseBlockScreen() {
   const {colors, fonts} = theme;
 
   return (
-    <View
-      style={[styles.container, {backgroundColor: colors.background}]}
-      testID="license-block-screen">
-      <View style={[styles.card, {backgroundColor: colors.surface}]}>
-        <Text style={[styles.icon, {color: colors.danger}]}>🔒</Text>
-        <Text
-          style={[styles.title, {color: colors.text, fontSize: fonts.xxlarge}]}>
-          Licencia vencida
-        </Text>
-        <Text
-          style={[
-            styles.message,
-            {color: colors.textSecondary, fontSize: fonts.medium},
-          ]}>
-          Contacte a soporte para renovar su licencia.
-        </Text>
+    <GlassBackground>
+      <View style={styles.container} testID="license-block-screen">
+        <GlassSurface style={styles.card} elevation="raised">
+          <Text style={[styles.icon, {fontSize: 56}]}>🔒</Text>
+          <Text style={[styles.title, {color: colors.text, fontSize: fonts.xxlarge}]}>
+            Licencia vencida
+          </Text>
+          <Text
+            style={[
+              styles.message,
+              {color: colors.textSecondary, fontSize: fonts.medium},
+            ]}>
+            Contacte a soporte para renovar su licencia.
+          </Text>
+        </GlassSurface>
       </View>
-    </View>
+    </GlassBackground>
   );
 }
 
@@ -52,8 +51,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  card: {borderRadius: 20, padding: 32, alignItems: 'center', maxWidth: 480},
-  icon: {fontSize: 56, marginBottom: 16},
+  card: {padding: 32, alignItems: 'center', maxWidth: 480},
+  icon: {marginBottom: 16},
   title: {fontWeight: '800', textAlign: 'center'},
   message: {textAlign: 'center', marginTop: 8},
 });

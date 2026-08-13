@@ -1,5 +1,5 @@
 /**
- * screens/ConnectionScreen.tsx — Pantalla de conexión al servidor (RF-DS).
+ * screens/ConnectionScreen.tsx — Conexión al servidor (RF-DS, spec glass).
  *
  * ────────────────────────────────────────────────────────────────────────
  * Qué hace esta pantalla:
@@ -8,6 +8,7 @@
  *   - Si el servidor no responde, muestra "Servidor no disponible" y
  *     reintenta automáticamente cada 5s (RNF-002).
  *   - Ofrece alternativas manuales: IP+puerto y emparejamiento por QR.
+ * Rediseñada con estética glass (fondo + tarjetas).
  * ────────────────────────────────────────────────────────────────────────
  *
  * Secciones:
@@ -29,6 +30,8 @@ import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import POSButton from '../components/POSButton';
+import GlassBackground from '../components/GlassBackground';
+import GlassSurface from '../components/GlassSurface';
 import {RootStackParamList} from '../navigation';
 import {useTheme} from '../hooks/useTheme';
 import {useServerStore} from '../stores/server.store';
@@ -42,7 +45,7 @@ export default function ConnectionScreen() {
   /* ── 1) HOOKS Y ESTADO LOCAL ─────────────────────────────────────── */
 
   const theme = useTheme();
-  const {colors, fonts} = theme;
+  const {colors, fonts, spacing} = theme;
   const navigation = useNavigation<Nav>();
 
   // Estado del servidor (Zustand): status/lastError/setLastError
@@ -120,133 +123,122 @@ export default function ConnectionScreen() {
   const serverDown = status === 'failed' && !searching;
 
   return (
-    <ScrollView
-      style={[styles.container, {backgroundColor: colors.background}]}
-      contentContainerStyle={styles.content}>
-      {/* Encabezado */}
-      <Text style={[styles.title, {color: colors.text, fontSize: fonts.xxlarge}]}>
-        Sistema POS
-      </Text>
-      <Text
-        style={[
-          styles.subtitle,
-          {color: colors.textSecondary, fontSize: fonts.medium},
-        ]}>
-        Buscando servidor en la red local…
-      </Text>
-
-      {/* Banner de servidor no disponible con auto-reintento (RNF-002) */}
-      {serverDown && (
-        <View style={[styles.banner, {backgroundColor: colors.danger}]}>
-          <Text
-            style={[
-              styles.bannerText,
-              {color: colors.onPrimary, fontSize: fonts.medium},
-            ]}>
-            Servidor no disponible
-          </Text>
-          <Text
-            style={[
-              styles.bannerSub,
-              {color: colors.onPrimary, fontSize: fonts.small},
-            ]}>
-            Reintentando automáticamente cada 5 segundos
-          </Text>
-        </View>
-      )}
-
-      {lastError ? (
-        <Text
-          style={[styles.error, {color: colors.danger, fontSize: fonts.small}]}>
-          {lastError}
+    <GlassBackground>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, {padding: spacing.lg}]}>
+        {/* Encabezado */}
+        <Text style={[styles.title, {color: colors.text, fontSize: fonts.xxlarge}]}>
+          Sistema POS
         </Text>
-      ) : null}
+        <Text style={[styles.subtitle, {color: colors.textSecondary, fontSize: fonts.medium}]}>
+          Buscando servidor en la red local…
+        </Text>
 
-      {/* Búsqueda automática */}
-      <POSButton
-        title={searching ? 'Buscando servidor…' : 'Buscar servidor'}
-        onPress={runDiscovery}
-        loading={searching}
-        large
-        testID="btn-buscar-servidor"
-      />
+        {/* Banner de servidor no disponible con auto-reintento (RNF-002) */}
+        {serverDown && (
+          <GlassSurface
+            style={[styles.banner, {backgroundColor: colors.dangerSoft}]}>
+            <Text style={[styles.bannerTitle, {color: colors.danger, fontSize: fonts.medium}]}>
+              Servidor no disponible
+            </Text>
+            <Text style={[styles.bannerSub, {color: colors.danger, fontSize: fonts.small}]}>
+              Reintentando automáticamente cada 5 segundos
+            </Text>
+          </GlassSurface>
+        )}
 
-      <View style={styles.divider} />
+        {lastError ? (
+          <Text style={[styles.error, {color: colors.danger, fontSize: fonts.small}]}>
+            {lastError}
+          </Text>
+        ) : null}
 
-      {/* Conexión manual (RF-DS-004) */}
-      <Text
-        style={[
-          styles.sectionTitle,
-          {color: colors.text, fontSize: fonts.medium},
-        ]}>
-        Conexión manual
-      </Text>
-      <TextInput
-        style={[
-          styles.input,
-          {
-            backgroundColor: colors.input,
-            borderColor: colors.border,
-            color: colors.text,
-            fontSize: fonts.regular,
-          },
-        ]}
-        placeholder="IP del servidor (ej. 192.168.1.10)"
-        placeholderTextColor={colors.textSecondary}
-        value={manualIp}
-        onChangeText={setManualIp}
-        keyboardType="decimal-pad"
-        autoCapitalize="none"
-        testID="input-ip-manual"
-      />
-      <TextInput
-        style={[
-          styles.input,
-          {
-            backgroundColor: colors.input,
-            borderColor: colors.border,
-            color: colors.text,
-            fontSize: fonts.regular,
-          },
-        ]}
-        placeholder="Puerto (3000)"
-        placeholderTextColor={colors.textSecondary}
-        value={manualPort}
-        onChangeText={setManualPort}
-        keyboardType="number-pad"
-        testID="input-puerto-manual"
-      />
-      <POSButton
-        title="Conectar con IP manual"
-        onPress={handleManualConnect}
-        variant="secondary"
-        testID="btn-ip-manual"
-      />
+        {/* Búsqueda automática */}
+        <POSButton
+          title={searching ? 'Buscando servidor…' : 'Buscar servidor'}
+          onPress={runDiscovery}
+          loading={searching}
+          large
+          testID="btn-buscar-servidor"
+        />
 
-      <View style={styles.divider} />
+        <View style={styles.divider} />
 
-      {/* Emparejamiento por QR (RF-DS-003) */}
-      <POSButton
-        title="Escanear código QR de emparejamiento"
-        onPress={handleQrPairing}
-        variant="ghost"
-        testID="btn-qr-pairing"
-      />
-    </ScrollView>
+        {/* Conexión manual (RF-DS-004) */}
+        <GlassSurface style={styles.form}>
+          <Text style={[styles.sectionTitle, {color: colors.text, fontSize: fonts.medium}]}>
+            Conexión manual
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.border,
+                color: colors.text,
+                fontSize: fonts.regular,
+              },
+            ]}
+            placeholder="IP del servidor (ej. 192.168.1.10)"
+            placeholderTextColor={colors.textDisabled}
+            value={manualIp}
+            onChangeText={setManualIp}
+            keyboardType="decimal-pad"
+            autoCapitalize="none"
+            testID="input-ip-manual"
+          />
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.border,
+                color: colors.text,
+                fontSize: fonts.regular,
+              },
+            ]}
+            placeholder="Puerto (3000)"
+            placeholderTextColor={colors.textDisabled}
+            value={manualPort}
+            onChangeText={setManualPort}
+            keyboardType="number-pad"
+            testID="input-puerto-manual"
+          />
+          <POSButton
+            title="Conectar con IP manual"
+            onPress={handleManualConnect}
+            variant="secondary"
+            testID="btn-ip-manual"
+          />
+        </GlassSurface>
+
+        <View style={styles.divider} />
+
+        {/* Emparejamiento por QR (RF-DS-003) */}
+        <POSButton
+          title="Escanear código QR de emparejamiento"
+          onPress={handleQrPairing}
+          variant="ghost"
+          testID="btn-qr-pairing"
+        />
+      </ScrollView>
+    </GlassBackground>
   );
 }
 
 /* ── Estilos de la pantalla ─────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: {flex: 1},
-  content: {padding: 24, justifyContent: 'center'},
+  content: {justifyContent: 'center'},
   title: {textAlign: 'center', fontWeight: '800', marginTop: 32},
   subtitle: {textAlign: 'center', marginVertical: 12},
   banner: {borderRadius: 12, padding: 16, marginVertical: 12},
-  bannerText: {textAlign: 'center', fontWeight: '700'},
+  bannerTitle: {textAlign: 'center', fontWeight: '700'},
   bannerSub: {textAlign: 'center', marginTop: 4},
   error: {textAlign: 'center', marginVertical: 8},
   divider: {height: 1, marginVertical: 16},
+  form: {padding: 16},
   sectionTitle: {fontWeight: '700', marginBottom: 8},
   input: {
     borderWidth: 1,

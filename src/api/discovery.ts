@@ -21,6 +21,7 @@
  *   4) Broadcast UDP + parseo de QR + registro del servidor
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Platform} from 'react-native';
 import {
   STORAGE_SERVER_IP,
   STORAGE_SERVER_PORT,
@@ -121,6 +122,11 @@ export async function discoverServer(): Promise<DiscoveredServer | null> {
 /**
  * Envía "POS_DISCOVER" por UDP broadcast y espera la respuesta del
  * servidor ({ip, port, tenant_id, ...}). Implementación en services/.
+ *
+ * Nota NAT del emulador Android: el broadcast UDP a 255.255.255.255 no
+ * recibe respuesta a través de la red SLIRP del AVD (10.0.2.x). Por eso,
+ * en Android se prueba también el host del emulador (10.0.2.2) y la IP
+ * guardada por si el broadcast no llega (RF-DS-002).
  */
 export async function broadcastDiscover(): Promise<DiscoveredServer | null> {
   // Import dinámico: no rompe la carga en plataformas sin UDP nativo.
@@ -131,15 +137,30 @@ export async function broadcastDiscover(): Promise<DiscoveredServer | null> {
       port: UDP_DISCOVERY_PORT,
     });
     if (result) {
-      return {
+      // El servidor devuelve su IP de LAN; si es loopback (mismo host)
+      // o alcanzable, se valida con /health antes de aceptarlo.
+      const candidate: DiscoveredServer = {
         ip: result.ip,
         port: result.port ?? 3000,
         tenantCode: result.tenantId,
       };
+      if (await testServer(candidate)) {
+        return candidate;
+      }
     }
   } catch {
     /* UDP no disponible en esta plataforma */
   }
+
+  // Fallback emulador Android: el host corre en 10.0.2.2 (SLIRP NAT).
+  // El broadcast UDP no siempre funciona en el AVD; probar directo.
+  if (Platform.OS === 'android') {
+    const emulatorHost: DiscoveredServer = {ip: '10.0.2.2', port: 3000};
+    if (await testServer(emulatorHost)) {
+      return emulatorHost;
+    }
+  }
+
   return null;
 }
 

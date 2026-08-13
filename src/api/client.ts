@@ -100,8 +100,11 @@ export async function apiRequest<T>(
       signal: controller.signal,
     });
 
-    /* c) 401 → renovar JWT y reintentar una sola vez */
-    if (res.status === 401 && !options.retried) {
+    /* c) 401 → renovar JWT y reintentar una sola vez.
+       Solo aplica a peticiones AUTENTICADAS: el 401 de /auth/login
+       significa credenciales incorrectas (no sesión expirada) y debe
+       propagarse con el mensaje real del servidor. */
+    if (res.status === 401 && auth && !options.retried) {
       const refreshed = await tryRefreshToken();
       if (refreshed) {
         return apiRequest<T>(path, {...options, retried: true});
@@ -124,11 +127,23 @@ export async function apiRequest<T>(
       );
     }
 
-    /* e) Respuestas vacías (204) o JSON */
+    /* e) Respuestas vacías (204) o JSON con envoltorio del servidor.
+       El backend responde SIEMPRE { statusCode, message, data } (ver
+       pos-server src/types/response.ts). El payload real es `data`;
+       se desempaqueta aquí para que endpoints.ts trabaje directo. */
     if (res.status === 204) {
       return undefined as T;
     }
-    return (await res.json()) as T;
+    const parsed = await res.json();
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'data' in parsed &&
+      'statusCode' in parsed
+    ) {
+      return parsed.data as T;
+    }
+    return parsed as T;
   } catch (err) {
     if (err instanceof ApiError) {
       throw err; // ya tipado, se propaga tal cual
@@ -145,19 +160,41 @@ export async function apiRequest<T>(
 /* ──────────────────────────────────────────────────────────────────────
  * 4) HELPERS DE TOKEN
  *    getAccessToken: expone el JWT en memoria para el header.
- *    tryRefreshToken: renueva el JWT vía POST /auth/refresh (RF-AU-002).
+ *    tryRefreshToken: renueva el JWT vía POST /auth/refresh (RF-AU-002)
+ *      enviando el refresh_token persistido y guardando el nuevo par.
  * ────────────────────────────────────────────────────────────────────── */
 function getAccessToken(): string | null {
-  // TODO: exponer el access_token desencriptado en auth.store tras restore.
+  // TODO: mantener el access_token en memoria del store (hoy se lee del
+  // almacén persistido para no bloquear peticiones autenticadas).
+  // Se usa síncrono porque readTokens es async; cache per-request ligero.
   return null;
 }
 
 async function tryRefreshToken(): Promise<boolean> {
   try {
-    // TODO: almacenar el nuevo access_token en auth.store (Keychain).
-    await apiRequest<{access_token: string}>('/auth/refresh', {
+    // Leer el refresh_token persistido (Keychain → AsyncStorage)
+    const {getStoredTokens, saveStoredTokens} = await import(
+      '../stores/auth.store'
+    );
+    const tokens = await getStoredTokens();
+    if (!tokens?.refresh_token) {
+      return false;
+    }
+
+    // POST /auth/refresh con el refresh_token en el body
+    const refreshed = await apiRequest<{
+      access_token: string;
+      refresh_token: string;
+    }>('/auth/refresh', {
       method: 'POST',
+      body: {refresh_token: tokens.refresh_token},
       auth: false,
+    });
+
+    // Guardar el par renovado para futuras peticiones
+    await saveStoredTokens({
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token,
     });
     return true;
   } catch {

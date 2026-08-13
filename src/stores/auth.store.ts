@@ -34,7 +34,7 @@ import {
 const KEYCHAIN_AUTH = 'pos.auth.tokens';
 
 /** Forma de los tokens persistidos (acceso + refresh) */
-interface PersistedTokens {
+export interface PersistedTokens {
   access_token: string;
   refresh_token: string;
 }
@@ -100,6 +100,19 @@ async function readTokens(): Promise<PersistedTokens | null> {
   }
   const raw = await AsyncStorage.getItem(KEYCHAIN_AUTH);
   return raw ? (JSON.parse(raw) as PersistedTokens) : null;
+}
+
+/**
+ * Lee los tokens persistidos (Keychain → AsyncStorage).
+ * Lo usa client.ts para el refresh (RF-AU-002).
+ */
+export async function getStoredTokens(): Promise<PersistedTokens | null> {
+  return readTokens();
+}
+
+/** Persiste un nuevo par de tokens (tras refresh). */
+export async function saveStoredTokens(tokens: PersistedTokens): Promise<void> {
+  await storeTokens(tokens);
 }
 
 /* ──────────────────────────────────────────────────────────────────────

@@ -40,20 +40,77 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 ## Puesta en marcha
 
+### Orden correcto (Android)
+
+El error `Error: device is still booting` en `app:installDebug` ocurre cuando
+Gradle intenta instalar el APK **antes de que el emulador termine de arrancar**.
+El boot del AVD (45s+) puede ser más lento que la compilación (73s). La regla:
+**siempre esperar `sys.boot_completed=1` antes de instalar**.
+
 ```sh
 cd pos-mobile
 nvm use                 # activa Node 20 (lee .nvmrc)
+npm install             # solo la primera vez
+
+# 1) Servidor de Metro (terminal 1) — primero, para que la app cargue el bundle
+npm start
+
+# 2) Emulador (terminal 2) — si no está encendido
+nohup emulator -avd POS_Tablet -no-audio -no-boot-anim -gpu host -no-snapshot-load &
+
+# 3) ESPERAR el boot completo ANTES de compilar/instalar (clave)
+adb wait-for-device
+adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+
+# 4) Ahora sí, compilar + instalar + lanzar (terminal 2)
+npx react-native run-android
+```
+
+> Si el emulador ya está encendido pero `run-android` falla igual por timing,
+> instala el APK ya compilado y lánzalo directamente:
+> ```sh
+> adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+> adb shell am start -n com.posmobile/.MainActivity
+> ```
+
+**Solo build del APK debug** (sin instalar):
+
+```sh
+npx react-native build-android --mode=debug
+```
+
+### Debugging (Android)
+
+- **Metro en otra terminal**: `npm start` sirve el bundle JS por el puerto
+  8081. La app debug la descarga en caliente; editar código recarga con
+  **R** (doble **R** fuerza reload completo).
+- **DevMenu**: sacude el dispositivo o `adb shell input keyevent 82`
+  (menu) para abrir el menú de desarrollo (reload, debug JS, etc.).
+- **Logs de la app**: `adb logcat` filtra por la app:
+  `adb logcat --pid=$(adb shell pidof com.posmobile)`. Los `console.log`
+  aparecen en la terminal de Metro.
+- **Debugger JS**: en el DevMenu, "Debug" abre Chrome DevTools; con React
+  DevTools standalone puedes inspeccionar el árbol de componentes.
+- **Reinstalar sin recompilar** (cuando el APK ya existe): `adb install -r
+  android/app/build/outputs/apk/debug/app-debug.apk && adb shell am start
+  -n com.posmobile/.MainActivity`.
+
+### Windows (requiere PC con Visual Studio)
+
+```sh
+cd pos-mobile
+nvm use
 npm install
 
-# Android (emulador o dispositivo conectado)
-npx react-native run-android
+# 1) Servidor de Metro (terminal 1)
+npm start
 
-# Solo build del APK debug
-npx react-native build-android --mode=debug
-
-# Windows (requiere PC con Visual Studio; ver sección Windows)
+# 2) Terminal 2 — compilar + instalar + lanzar en la PC Windows
 npm run windows
 ```
+
+Ver sección [Windows (React Native Windows 0.84)](#windows-react-native-windows-084)
+para requisitos y debugging.
 
 ## Emulador Android (AVD) — pasos manuales
 
@@ -101,6 +158,11 @@ npm run android
 > - Verificar aceleración con: `emulator -accel-check` (debe decir `HVF` OK).
 
 > **Troubleshooting:**
+> - **`Task :app:installDebug FAILED` / `Error: device is still booting`**: el
+>   emulador no había terminado de arrancar. Espera el boot antes de instalar:
+>   `adb wait-for-device && adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'`
+>   y vuelve a `npx react-native run-android` (o instala el APK ya compilado
+>   con `adb install -r`).
 > - **Metro muere con "node_modules/node_modules: No such file"**: es un bug de
 >   watchman + los `watchFolders` del template RNW (rutas inexistentes). El
 >   `metro.config.js` ya está corregido; si reaparece:
@@ -108,6 +170,11 @@ npm run android
 > - **"Property 'Buffer' doesn't exist"** al descubrir el servidor: Hermes no
 >   define `Buffer` global. `udp-discovery.ts` ya envía strings (react-native-udp
 >   los convierte a Buffer internamente); no volver a usar `Buffer.from` ahí.
+> - **Emulador congelado / arranque lento**: verifica aceleración con
+>   `emulator -accel-check` (debe decir `HVF` OK) y que el AVD use
+>   `1280x800 @ 213dpi` (pasos en la sección de emulador).
+> - **"device offline" en adb**: reinicia el servidor de adb:
+>   `adb kill-server && adb start-server`.
 
 ## Scripts disponibles
 
@@ -134,12 +201,18 @@ pos-mobile/
 │   │   ├── client.ts       # Cliente HTTP (timeout, 401→refresh, errores)
 │   │   ├── discovery.ts    # Orden de descubrimiento: IP→UDP→QR→manual (RF-DS)
 │   │   └── endpoints.ts    # Todos los endpoints del servidor (sección 8.2 PRD)
-│   ├── components/         # UI reutilizable (POSButton, etc.)
-│   ├── constants/          # theme.ts (claro/oscuro), app.ts (puertos, timeouts)
+│   ├── components/         # Sistema de diseño glass (spec UI_UX_DESIGN.md)
+│   │   ├── GlassSurface.tsx, GlassBackground.tsx   # Superficies + blobs
+│   │   ├── TopAppBar.tsx, BottomNavBar.tsx         # Navegación global
+│   │   ├── SearchInput.tsx, FilterChip.tsx         # Búsqueda y filtros
+│   │   ├── StatusChip.tsx, KpiCard.tsx, ProductCard.tsx, Fab.tsx
+│   │   └── POSButton.tsx
+│   ├── constants/          # theme.ts (glass/indigo), app.ts, mock-data.ts
 │   ├── hooks/              # useTheme
 │   ├── models/             # Tipos espejo de la API (productos, ventas, …)
 │   ├── navigation/         # Stack: Conexión → Login → Dashboard
-│   ├── screens/            # Connection, Login, Dashboard, LicenseBlock
+│   ├── screens/            # Connection, Login, Dashboard (tabs),
+│   │   #                     PosTerminal, Inventory, CashierCut, Receipt, Reports
 │   ├── services/
 │   │   └── udp-discovery.ts# Broadcast "POS_DISCOVER" por plataforma
 │   ├── stores/             # Zustand
@@ -149,6 +222,7 @@ pos-mobile/
 │   │   └── server.store.ts # Estado del servidor descubierto [RF-DS]
 │   └── utils/
 ├── App.tsx                 # Raíz: restaura sesión, tema, navegador
+├── UI_UX_DESIGN.md         # Design spec (Glassmorphism, paleta, pantallas)
 ├── index.js                # Entry point
 ├── jest.config.js          # Jest con transform de paquetes ESM
 └── jest.setup.js           # Mocks de módulos nativos
@@ -187,6 +261,46 @@ Login: tenant_code + PIN → validar licencia + dispositivos → Dashboard
   y `npx @react-native-community/cli run-windows` (script `npm run windows`).
 - Si RNW llegara a un límite duro, el PRD contempla Electron como Plan B
   (no cambiar sin consultar).
+
+### Requisitos (en la PC Windows)
+
+| Requisito | Detalle |
+|-----------|---------|
+| Visual Studio 2026 | Carga de trabajo **"Desarrollo para escritorio con C++"** |
+| Windows SDK | 10.0.22621 o superior |
+| Node.js | 20 (mismo `.nvmrc`) |
+| PowerShell | 5.1 o 7 (pwsh) |
+
+### Orden correcto (Windows)
+
+```powershell
+# 1) Terminal 1 — Metro bundler
+cd pos-mobile
+nvm use
+npm start
+
+# 2) Terminal 2 — compilar, instalar y lanzar la app de escritorio
+cd pos-mobile
+nvm use
+npm run windows          # = npx @react-native-community/cli run-windows
+```
+
+> Si la carpeta `windows/` no existe o está corrupta, regenérala:
+> `node scripts/generate-windows.js` y repite `npm run windows`.
+
+### Debugging (Windows)
+
+- **Metro en otra terminal**: la app Windows se conecta a Metro por el
+  puerto 8081 igual que Android. Si la app abre sin contenido, revisa que
+  `npm start` esté corriendo y que el firewall permita 8081.
+- **DevTools**: con la app corriendo, presiona `Ctrl+Shift+D` (DevMenu de
+  RNW) para recargar el bundle, abrir el inspector de React DevTools o
+  cambiar de servidor de Metro.
+- **Logs**: los `console.log` salen en la terminal de Metro. Errores nativos
+  (C++) se ven en el **Output/Depurador de Visual Studio** o con el
+  Depurador de eventos de Windows.
+- **Reconstrucción limpia** (ante estados raros): cierra la app,
+  `npx react-native-windows` cache y vuelve a correr `npm run windows`.
 
 ## Testing
 
