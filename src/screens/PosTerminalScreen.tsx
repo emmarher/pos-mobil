@@ -31,11 +31,14 @@ interface PosTerminalScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  /** Al tocar el avatar (menú de usuario / cerrar sesión) */
+  onAvatarPress?: () => void;
 }
 
 export default function PosTerminalScreen({
   activeTab,
   onTabChange,
+  onAvatarPress,
 }: PosTerminalScreenProps) {
   const {colors, fonts, spacing} = useTheme();
 
@@ -67,7 +70,7 @@ export default function PosTerminalScreen({
 
   return (
     <GlassBackground>
-      <TopAppBar title="Terminal de ventas" notificationCount={2} />
+      <TopAppBar title="Terminal de ventas" notificationCount={2} onAvatarPress={onAvatarPress} />
 
       {/* Búsqueda + categorías */}
       <View style={styles.header}>
@@ -90,11 +93,11 @@ export default function PosTerminalScreen({
         </View>
       </View>
 
-      {/* Catálogo en grid 2 columnas */}
+      {/* Catálogo en grid 4 columnas */}
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
-        numColumns={2}
+        numColumns={4}
         columnWrapperStyle={styles.row}
         contentContainerStyle={{padding: spacing.md, paddingBottom: 160}}
         ListEmptyComponent={
@@ -125,7 +128,7 @@ export default function PosTerminalScreen({
 const styles = StyleSheet.create({
   header: {paddingHorizontal: 16, paddingTop: 12},
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  row: {gap: 12},
+  row: {gap: 20, rowGap: 32},
   cell: {flex: 1},
   empty: {alignItems: 'center', paddingTop: 48},
   emptyText: {fontWeight: '600'},

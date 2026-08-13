@@ -22,14 +22,20 @@ interface ReportsScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  /** Al tocar el avatar (menú de usuario / cerrar sesión) */
+  onAvatarPress?: () => void;
 }
 
-export default function ReportsScreen({activeTab, onTabChange}: ReportsScreenProps) {
+export default function ReportsScreen({
+  activeTab,
+  onTabChange,
+  onAvatarPress,
+}: ReportsScreenProps) {
   const {colors, fonts, spacing} = useTheme();
 
   return (
     <GlassBackground>
-      <TopAppBar title="Reportes" />
+      <TopAppBar title="Reportes" onAvatarPress={onAvatarPress} />
 
       <ScrollView contentContainerStyle={{padding: spacing.md, paddingBottom: 120}}>
         <Text style={[styles.sectionTitle, {color: colors.text, fontSize: fonts.medium}]}>

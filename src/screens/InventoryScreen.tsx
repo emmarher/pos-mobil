@@ -29,6 +29,8 @@ interface InventoryScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  /** Al tocar el avatar (menú de usuario / cerrar sesión) */
+  onAvatarPress?: () => void;
 }
 
 /** Deriva el status de stock (umbral min_stock; spec 3.8) */
@@ -41,6 +43,7 @@ function stockStatus(row: InventoryRow): StockStatus {
 export default function InventoryScreen({
   activeTab,
   onTabChange,
+  onAvatarPress,
 }: InventoryScreenProps) {
   const {colors, fonts, spacing} = useTheme();
 
@@ -56,7 +59,7 @@ export default function InventoryScreen({
 
   return (
     <GlassBackground>
-      <TopAppBar title="Inventario" notificationCount={1} />
+      <TopAppBar title="Inventario" notificationCount={1} onAvatarPress={onAvatarPress} />
 
       {/* Búsqueda + filtro avanzado */}
       <View style={styles.header}>
