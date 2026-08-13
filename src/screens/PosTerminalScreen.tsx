@@ -6,8 +6,9 @@
  *   - TopAppBar (avatar, "Terminal de ventas", notificación).
  *   - Búsqueda global con debounce.
  *   - Chips de categoría (Todos, Comida, Bebidas, Electrónicos…).
- *   - Catálogo en grid 2 columnas (ProductCard).
- *   - FAB carrito con badge de ítems.
+ *   - Catálogo en grid (ProductCard).
+ *   - Al tocar un producto → ProductSheet (cantidad → carrito).
+ *   - FAB carrito → CartSheet (totales, pago, confirmar POST /sales).
  *   - BottomNavBar (Caja/Inventario/Reportes).
  * Usa datos mock hasta conectar la API real (Fase 4 del changelog).
  * ────────────────────────────────────────────────────────────────────────
@@ -22,10 +23,13 @@ import SearchInput from '../components/SearchInput';
 import FilterChip from '../components/FilterChip';
 import ProductCard from '../components/ProductCard';
 import Fab from '../components/Fab';
+import ProductSheet from '../components/ProductSheet';
+import CartSheet from '../components/CartSheet';
 
 import {useTheme} from '../hooks/useTheme';
 import {MOCK_CATEGORIES, MOCK_PRODUCTS} from '../constants/mock-data';
 import {Product} from '../models';
+import {useCartStore} from '../stores/cart.store';
 
 interface PosTerminalScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
@@ -45,7 +49,14 @@ export default function PosTerminalScreen({
   /* ── Estado local ─────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [cartCount, setCartCount] = useState(3); // mock: carrito con 3 ítems
+
+  // Producto seleccionado para el sheet de cantidad (null = cerrado)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  // Carrito visible
+  const [cartVisible, setCartVisible] = useState(false);
+
+  // Carrito real (Zustand): badge con el conteo de ítems
+  const cartCount = useCartStore(state => state.items.length);
 
   /* ── Filtrado: búsqueda (debounce 300ms) + categoría ─────────────── */
   const filtered = useMemo(() => {
@@ -60,13 +71,6 @@ export default function PosTerminalScreen({
       return matchCat && matchQ;
     });
   }, [query, activeCategory]);
-
-  /* ── Acciones (mock; se conectan a la API en Fase 4) ─────────────── */
-  const addToCart = (product: Product) => {
-    setCartCount(c => c + 1);
-    // TODO(Fase 4): addItem({product, quantity: 1, priceType, ...})
-    console.log('Agregar al carrito:', product.name);
-  };
 
   return (
     <GlassBackground>
@@ -93,7 +97,7 @@ export default function PosTerminalScreen({
         </View>
       </View>
 
-      {/* Catálogo en grid 4 columnas */}
+      {/* Catálogo en grid */}
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
@@ -109,13 +113,30 @@ export default function PosTerminalScreen({
         }
         renderItem={({item}) => (
           <View style={styles.cell}>
-            <ProductCard product={item} onPress={() => addToCart(item)} testID={`product-${item.id}`} />
+            <ProductCard
+              product={item}
+              onPress={() => setSelectedProduct(item)}
+              testID={`product-${item.id}`}
+            />
           </View>
         )}
       />
 
+      {/* Sheet de cantidad al tocar un producto */}
+      <ProductSheet
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+      />
+
+      {/* Carrito al tocar el FAB */}
+      <CartSheet visible={cartVisible} onClose={() => setCartVisible(false)} />
+
       {/* FAB carrito con badge */}
-      <Fab onPress={() => console.log('Abrir carrito')} badgeCount={cartCount} testID="fab-cart" />
+      <Fab
+        onPress={() => setCartVisible(true)}
+        badgeCount={cartCount}
+        testID="fab-cart"
+      />
 
       {/* Navegación inferior (controlada por el Dashboard) */}
       <View style={styles.bottomNav}>

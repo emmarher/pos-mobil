@@ -83,10 +83,12 @@ export async function apiRequest<T>(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
 
-  /* b) Headers: JSON + token Bearer si aplica */
+  /* b) Headers: JSON + token Bearer si aplica.
+     El access_token se lee del almacén persistido (Keychain/AsyncStorage)
+     en cada request; así las peticiones autenticadas llevan el JWT. */
   const headers: Record<string, string> = {'Content-Type': 'application/json'};
   if (auth) {
-    const token = getAccessToken();
+    const token = await getAccessToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -163,11 +165,14 @@ export async function apiRequest<T>(
  *    tryRefreshToken: renueva el JWT vía POST /auth/refresh (RF-AU-002)
  *      enviando el refresh_token persistido y guardando el nuevo par.
  * ────────────────────────────────────────────────────────────────────── */
-function getAccessToken(): string | null {
-  // TODO: mantener el access_token en memoria del store (hoy se lee del
-  // almacén persistido para no bloquear peticiones autenticadas).
-  // Se usa síncrono porque readTokens es async; cache per-request ligero.
-  return null;
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const {getStoredTokens} = await import('../stores/auth.store');
+    const tokens = await getStoredTokens();
+    return tokens?.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function tryRefreshToken(): Promise<boolean> {

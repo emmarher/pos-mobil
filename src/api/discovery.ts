@@ -27,7 +27,6 @@ import {
   STORAGE_SERVER_PORT,
   UDP_DISCOVERY_PORT,
   UDP_DISCOVERY_MESSAGE,
-  FAILED_CONNECTIONS_TO_REACTIVATE_UDP,
 } from '../constants/app';
 import {useServerStore, ServerInfo} from '../stores/server.store';
 
@@ -94,22 +93,21 @@ export async function discoverServer(): Promise<DiscoveredServer | null> {
     return {ip, port};
   }
 
-  // Paso 2: UDP broadcast — solo si no hay IP guardada o tras 3 fallos
-  // consecutivos (RF-DS-002: "Si falla 3 veces consecutivas → reactiva UDP").
-  if (
-    !(await AsyncStorage.getItem(STORAGE_SERVER_IP)) ||
-    store.consecutiveFailures >= FAILED_CONNECTIONS_TO_REACTIVATE_UDP
-  ) {
-    const udp = await broadcastDiscover();
-    if (udp) {
-      // Persistimos la IP encontrada para aperturas futuras
-      await AsyncStorage.setItem(STORAGE_SERVER_IP, udp.ip);
-      await AsyncStorage.setItem(STORAGE_SERVER_PORT, String(udp.port));
-      store.resetFailures();
-      store.setServer(udp);
-      store.setStatus('connected');
-      return udp;
-    }
+  // La IP guardada no respondió: registrar el fallo (RF-DS-002)
+  store.registerFailure();
+
+  // Paso 2: UDP broadcast + fallback emulador. Se prueba SIEMPRE que la
+  // IP guardada falle (no solo tras 3 fallos), para que en el emulador
+  // Android el fallback 10.0.2.2 encuentre el host sin esperar ciclos.
+  const udp = await broadcastDiscover();
+  if (udp) {
+    // Persistimos la IP encontrada para aperturas futuras
+    await AsyncStorage.setItem(STORAGE_SERVER_IP, udp.ip);
+    await AsyncStorage.setItem(STORAGE_SERVER_PORT, String(udp.port));
+    store.resetFailures();
+    store.setServer(udp);
+    store.setStatus('connected');
+    return udp;
   }
 
   store.setStatus('failed');

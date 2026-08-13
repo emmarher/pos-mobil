@@ -8,7 +8,17 @@
  * Nunca usar en producción.
  * ────────────────────────────────────────────────────────────────────────
  */
-import {Category, Product} from '../models';
+import {Category, PriceType, Product} from '../models';
+
+/** Tipo de precio default (Público) — el que aplica el carrito */
+export const MOCK_PRICE_TYPE: PriceType = {
+  id: 'pt-public',
+  tenant_id: 'demo',
+  code: 'PUBLIC',
+  name: 'Público',
+  is_default: true,
+  display_order: 0,
+};
 
 /** Categorías de ejemplo (chips del catálogo) */
 export const MOCK_CATEGORIES: Category[] = [
