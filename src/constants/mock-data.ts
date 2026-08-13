@@ -73,15 +73,17 @@ export interface InventoryRow {
   sku: string;
   stock: number;
   minStock: number;
+  /** Categoría (mismo id que MOCK_CATEGORIES) para el filtrado */
+  category_id: string;
 }
 
 export const MOCK_INVENTORY: InventoryRow[] = [
-  {id: 'i1', name: 'Coca-Cola 600ml', sku: 'SKU-BEB01', stock: 120, minStock: 20},
-  {id: 'i2', name: 'Sabritas 45g', sku: 'SKU-COM01', stock: 5, minStock: 10},
-  {id: 'i3', name: 'Galaxy S24 128GB', sku: 'SKU-ELE01', stock: 12, minStock: 3},
-  {id: 'i4', name: 'Huevo 30 pzas', sku: 'SKU-COM02', stock: 0, minStock: 10},
-  {id: 'i5', name: 'Jabón Zote 200g', sku: 'SKU-LIM02', stock: 3, minStock: 8},
-  {id: 'i6', name: 'Leche Lala 1L', sku: 'SKU-BEB02', stock: 40, minStock: 15},
+  {id: 'i1', name: 'Coca-Cola 600ml', sku: 'SKU-BEB01', stock: 120, minStock: 20, category_id: 'c-drinks'},
+  {id: 'i2', name: 'Sabritas 45g', sku: 'SKU-COM01', stock: 5, minStock: 10, category_id: 'c-food'},
+  {id: 'i3', name: 'Galaxy S24 128GB', sku: 'SKU-ELE01', stock: 12, minStock: 3, category_id: 'c-electronics'},
+  {id: 'i4', name: 'Huevo 30 pzas', sku: 'SKU-COM02', stock: 0, minStock: 10, category_id: 'c-food'},
+  {id: 'i5', name: 'Jabón Zote 200g', sku: 'SKU-LIM02', stock: 3, minStock: 8, category_id: 'c-cleaning'},
+  {id: 'i6', name: 'Leche Lala 1L', sku: 'SKU-BEB02', stock: 40, minStock: 15, category_id: 'c-drinks'},
 ];
 
 /** Corte de caja (comparativo + reconciliación + desglose) */

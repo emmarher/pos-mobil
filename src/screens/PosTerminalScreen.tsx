@@ -128,8 +128,8 @@ export default function PosTerminalScreen({
 const styles = StyleSheet.create({
   header: {paddingHorizontal: 16, paddingTop: 12},
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  row: {gap: 20, rowGap: 32},
-  cell: {flex: 1},
+  row: {gap: 20},
+  cell: {flex: 1, marginBottom: 24},
   empty: {alignItems: 'center', paddingTop: 48},
   emptyText: {fontWeight: '600'},
   bottomNav: {position: 'absolute', bottom: 0, left: 0, right: 0},

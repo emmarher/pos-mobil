@@ -17,13 +17,19 @@ import GlassBackground from '../components/GlassBackground';
 import TopAppBar from '../components/TopAppBar';
 import BottomNavBar, {NavTab} from '../components/BottomNavBar';
 import SearchInput from '../components/SearchInput';
+import FilterChip from '../components/FilterChip';
 import KpiCard from '../components/KpiCard';
 import StatusChip, {StockStatus} from '../components/StatusChip';
 import Fab from '../components/Fab';
 import GlassSurface from '../components/GlassSurface';
 
 import {useTheme} from '../hooks/useTheme';
-import {MOCK_INVENTORY, MOCK_INVENTORY_KPIS, InventoryRow} from '../constants/mock-data';
+import {
+  MOCK_CATEGORIES,
+  MOCK_INVENTORY,
+  MOCK_INVENTORY_KPIS,
+  InventoryRow,
+} from '../constants/mock-data';
 
 interface InventoryScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
@@ -48,14 +54,17 @@ export default function InventoryScreen({
   const {colors, fonts, spacing} = useTheme();
 
   const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return MOCK_INVENTORY;
-    return MOCK_INVENTORY.filter(
-      r => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q),
-    );
-  }, [query]);
+    return MOCK_INVENTORY.filter(r => {
+      const matchCat = activeCategory === 'all' || r.category_id === activeCategory;
+      const matchQ =
+        !q || r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q);
+      return matchCat && matchQ;
+    });
+  }, [query, activeCategory]);
 
   return (
     <GlassBackground>
@@ -78,6 +87,19 @@ export default function InventoryScreen({
             testID="btn-filter-advanced">
             <Text style={{fontSize: 18}}>⚙</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Chips de categoría (filtrado del catálogo) */}
+        <View style={[styles.chips, {marginTop: spacing.sm}]}>
+          {MOCK_CATEGORIES.map(cat => (
+            <FilterChip
+              key={cat.id}
+              label={cat.name}
+              active={activeCategory === cat.id}
+              onPress={() => setActiveCategory(cat.id)}
+              testID={`inv-chip-${cat.id}`}
+            />
+          ))}
         </View>
 
         {/* KPIs: Total Items / Agotados / Categorías */}
@@ -154,6 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chips: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   kpiRow: {flexDirection: 'row', gap: 8},
   kpi: {flex: 1},
   sectionTitle: {fontWeight: '700', marginBottom: 8},
