@@ -8,17 +8,38 @@
  * Nunca usar en producción.
  * ────────────────────────────────────────────────────────────────────────
  */
-import {Category, PriceType, Product} from '../models';
+import {Category, PriceType, Product, ProductPrice} from '../models';
 
-/** Tipo de precio default (Público) — el que aplica el carrito */
-export const MOCK_PRICE_TYPE: PriceType = {
-  id: 'pt-public',
-  tenant_id: 'demo',
-  code: 'PUBLIC',
-  name: 'Público',
-  is_default: true,
-  display_order: 0,
-};
+/** Tipos de precio del catálogo (Público = precio 1, default) */
+export const MOCK_PRICE_TYPES: PriceType[] = [
+  {
+    id: 'pt-public',
+    tenant_id: 'demo',
+    code: 'PUBLIC',
+    name: 'Público',
+    is_default: true,
+    display_order: 0,
+  },
+  {
+    id: 'pt-mayoreo',
+    tenant_id: 'demo',
+    code: 'MAYOREO',
+    name: 'Mayoreo',
+    is_default: false,
+    display_order: 1,
+  },
+  {
+    id: 'pt-especial',
+    tenant_id: 'demo',
+    code: 'ESPECIAL',
+    name: 'Especial',
+    is_default: false,
+    display_order: 2,
+  },
+];
+
+/** Tipo de precio default (Público) — el precio 1 */
+export const MOCK_PRICE_TYPE: PriceType = MOCK_PRICE_TYPES[0];
 
 /** Categorías de ejemplo (chips del catálogo) */
 export const MOCK_CATEGORIES: Category[] = [
@@ -31,6 +52,16 @@ export const MOCK_CATEGORIES: Category[] = [
 
 /** Producto base (espejo de Product) */
 function p(partial: Partial<Product> & Pick<Product, 'id' | 'name' | 'price' | 'stock'>): Product {
+  // Genera los 3 precios: Público = price base, Mayoreo +15%, Especial +25%
+  const prices: ProductPrice[] = MOCK_PRICE_TYPES.map((pt, i) => ({
+    id: `${partial.id}-${pt.id}`,
+    product_id: partial.id,
+    price_type_id: pt.id,
+    price: round2(partial.price * (i === 0 ? 1 : i === 1 ? 1.15 : 1.25)),
+    min_quantity: i === 0 ? 1 : i === 1 ? 10 : 5,
+    start_date: '2026-01-01',
+    end_date: null,
+  }));
   return {
     id: partial.id,
     tenant_id: 'demo',
@@ -51,7 +82,45 @@ function p(partial: Partial<Product> & Pick<Product, 'id' | 'name' | 'price' | '
     is_scale_enabled: partial.is_scale_enabled ?? false,
     allow_fractional_sale: partial.allow_fractional_sale ?? false,
     is_active: partial.is_active ?? true,
+    prices,
   };
+}
+
+/** Redondea a 2 decimales (precios). */
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Devuelve los precios disponibles de un producto combinados con sus tipos:
+ * [{ priceType, price }, ...]. Si el producto no trae `prices`, cae al
+ * precio 1 (Público) con product.price.
+ *
+ * `priceTypes` (opcional): lista real de GET /price-types para mapear los
+ * price_type_id del servidor a su nombre. Si no se pasa, usa MOCK_PRICE_TYPES.
+ */
+export function getProductPrices(
+  product: Product,
+  priceTypes?: PriceType[],
+): {priceType: PriceType; price: number}[] {
+  const types = priceTypes && priceTypes.length > 0 ? priceTypes : MOCK_PRICE_TYPES;
+  if (product.prices && product.prices.length > 0) {
+    return product.prices.map(pp => {
+      const priceType =
+        types.find(t => t.id === pp.price_type_id) ??
+        // Fallback: tipo derivado del id (si el servidor manda un tipo no listado)
+        ({
+          id: pp.price_type_id,
+          tenant_id: product.tenant_id,
+          code: pp.price_type_id,
+          name: 'Precio',
+          is_default: false,
+          display_order: 0,
+        } as PriceType);
+      return {priceType, price: pp.price};
+    });
+  }
+  return [{priceType: types[0], price: product.price}];
 }
 
 /** Catálogo del terminal de ventas (grid 2 columnas) */

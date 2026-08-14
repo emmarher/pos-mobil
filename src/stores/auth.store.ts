@@ -115,6 +115,40 @@ export async function saveStoredTokens(tokens: PersistedTokens): Promise<void> {
   await storeTokens(tokens);
 }
 
+/**
+ * Decodifica el payload del JWT (access_token) sin verificar firma, para
+ * reconstruir el usuario mínimo (id, permisos, rol) al restaurar sesión.
+ * Los permisos del JWT (RF-AU-002) viajan en el payload del token.
+ */
+function decodeUserFromToken(token: string): AuthResponse['user'] | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    // base64url → base64 estándar (padding) y decodificar con atob
+    // (NOTA: NO usar Buffer — Hermes/RN no lo define en todas las versiones).
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(padded)) as {
+      sub?: string;
+      tenant_id?: string;
+      role_name?: string | null;
+      permissions?: string[];
+      name?: string;
+    };
+    return {
+      id: payload.sub ?? '',
+      tenant_id: payload.tenant_id ?? '',
+      name: payload.name ?? '',
+      role_name: payload.role_name ?? undefined,
+      permissions: payload.permissions ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * 4) IMPLEMENTACIÓN ZUSTAND
  * ────────────────────────────────────────────────────────────────────── */
@@ -180,8 +214,19 @@ export const useAuthStore = create<AuthState>(set => ({
         licenseState = 'grace';
       }
     }
+    // Poblar el usuario desde el JWT (payload: sub, role_name, permissions).
+    // Sin esto, user queda null y los permisos (ej. reports:read) no se
+    // aplican tras restaurar la sesión.
+    const user = decodeUserFromToken(tokens.access_token);
+    const license = cachedExpiry
+      ? ({
+          status: licenseState,
+          expires_at: cachedExpiry,
+          max_devices: 0,
+        } as AuthResponse['license'])
+      : null;
     // La sesión se revalida contra el servidor en el arranque (validateLicense).
-    set({isAuthenticated: true, licenseState});
+    set({isAuthenticated: true, licenseState, user, license});
     return true;
   },
 

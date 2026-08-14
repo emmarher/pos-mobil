@@ -45,7 +45,8 @@ export default function ProductCard({product, onPress, testID}: ProductCardProps
 
   return (
     <TouchableOpacity testID={testID} onPress={onPress} activeOpacity={0.95}>
-      <GlassSurface style={styles.card}>
+      {/* opacity alta → cards casi sólidas (glass muy sutil, texto legible) */}
+      <GlassSurface opacity={0.94} style={styles.card}>
         <View style={[styles.thumbWrap, {marginBottom: spacing.sm}]}>
           <ProductThumb product={product} size={70} />
           {out && (

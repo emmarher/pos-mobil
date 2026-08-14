@@ -27,8 +27,12 @@ export const UDP_DISCOVERY_MESSAGE = 'POS_DISCOVER';
 
 /* ── 2) TIMEOUTS Y REINTENTOS ───────────────────────────────────────── */
 
-/** Timeout HTTP por petición (ms) */
-export const HTTP_TIMEOUT_MS = 5000;
+/**
+ * Timeout HTTP por petición (ms).
+ * 15s: la primera consulta de /products en SQLite tarda ~6s (joins a
+ * categorías/unidades); con 5s se abortaba antes de recibir la respuesta.
+ */
+export const HTTP_TIMEOUT_MS = 15000;
 
 /** Reintento de conexión cuando el servidor está caído (ms) — RNF-002 */
 export const SERVER_RETRY_MS = 5000;

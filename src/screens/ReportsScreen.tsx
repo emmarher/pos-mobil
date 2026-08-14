@@ -24,12 +24,15 @@ interface ReportsScreenProps {
   onTabChange: (tab: NavTab) => void;
   /** Al tocar el avatar (menú de usuario / cerrar sesión) */
   onAvatarPress?: () => void;
+  /** Pestañas visibles por permisos (Reportes oculta para el Vendedor) */
+  visibleTabs?: NavTab[];
 }
 
 export default function ReportsScreen({
   activeTab,
   onTabChange,
   onAvatarPress,
+  visibleTabs,
 }: ReportsScreenProps) {
   const {colors, fonts, spacing} = useTheme();
 
@@ -66,7 +69,7 @@ export default function ReportsScreen({
       </ScrollView>
 
       <View style={styles.bottomNav}>
-        <BottomNavBar active={activeTab} onChange={onTabChange} />
+        <BottomNavBar active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
       </View>
     </GlassBackground>
   );

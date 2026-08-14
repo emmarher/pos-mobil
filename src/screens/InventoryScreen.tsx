@@ -37,6 +37,8 @@ interface InventoryScreenProps {
   onTabChange: (tab: NavTab) => void;
   /** Al tocar el avatar (menú de usuario / cerrar sesión) */
   onAvatarPress?: () => void;
+  /** Pestañas visibles por permisos (Reportes oculta para el Vendedor) */
+  visibleTabs?: NavTab[];
 }
 
 /** Deriva el status de stock (umbral min_stock; spec 3.8) */
@@ -50,6 +52,7 @@ export default function InventoryScreen({
   activeTab,
   onTabChange,
   onAvatarPress,
+  visibleTabs,
 }: InventoryScreenProps) {
   const {colors, fonts, spacing} = useTheme();
 
@@ -158,7 +161,7 @@ export default function InventoryScreen({
 
       {/* Navegación inferior (controlada por el Dashboard) */}
       <View style={styles.bottomNav}>
-        <BottomNavBar active={activeTab} onChange={onTabChange} />
+        <BottomNavBar active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
       </View>
     </GlassBackground>
   );

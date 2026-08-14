@@ -68,6 +68,7 @@ export default function CartSheet({visible, onClose}: CartSheetProps) {
     const disc = items.reduce((s, it) => s + it.discount, 0);
     return {
       itemCount: items.length,
+      unitCount: items.reduce((s, it) => s + it.quantity, 0),
       subtotal: sub,
       discount: disc,
       total: Math.max(0, sub - disc),
@@ -113,7 +114,8 @@ export default function CartSheet({visible, onClose}: CartSheetProps) {
         <View style={[styles.handle, {backgroundColor: colors.border}]} />
 
         <Text style={[styles.title, {color: colors.text, fontSize: fonts.medium}]}>
-          Carrito · {t.itemCount} ítems
+          Carrito · {t.itemCount} {t.itemCount === 1 ? 'ítem' : 'ítems'} ·{' '}
+          {t.unitCount} {t.unitCount === 1 ? 'unidad' : 'unidades'}
         </Text>
 
         <ScrollView style={styles.items} contentContainerStyle={{paddingBottom: 8}}>
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
-    maxHeight: '85%',
+    maxHeight: '92%',
   },
   handle: {
     width: 40,
@@ -253,7 +255,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {fontWeight: '800', textAlign: 'center', marginBottom: 12},
-  items: {maxHeight: 260, marginBottom: 12},
+  // En landscape (pantalla baja) el sheet es más corto: el ScrollView debe
+  // encogerse y scrollar, no quedar cortado por un maxHeight fijo.
+  items: {flexShrink: 1, marginBottom: 12},
   empty: {textAlign: 'center', paddingVertical: 24},
   itemRow: {
     flexDirection: 'row',

@@ -20,29 +20,38 @@ import {
 } from 'react-native';
 
 import {useTheme} from '../hooks/useTheme';
-import {Product} from '../models';
-import {MOCK_PRICE_TYPE} from '../constants/mock-data';
+import {PriceType, Product} from '../models';
+import {getProductPrices} from '../constants/mock-data';
 import {useCartStore} from '../stores/cart.store';
 import POSButton from './POSButton';
 
 interface ProductSheetProps {
   product: Product | null;
   onClose: () => void;
+  /** Tipos de precio reales (GET /price-types) para mapear nombres */
+  priceTypes?: PriceType[];
 }
 
-export default function ProductSheet({product, onClose}: ProductSheetProps) {
+export default function ProductSheet({
+  product,
+  onClose,
+  priceTypes,
+}: ProductSheetProps) {
   const {colors, fonts, spacing, radius} = useTheme();
   const addItem = useCartStore(state => state.addItem);
 
   // Cantidad local; se resetea al abrir con un producto nuevo
   const [quantity, setQuantity] = useState(1);
   const [lastKey, setLastKey] = useState<string | null>(null);
+  // Precio seleccionado (default: precio 1 = Público)
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
 
-  // Reset cantidad cuando cambia el producto (o al cerrar)
+  // Reset cantidad + precio cuando cambia el producto (o al cerrar)
   React.useEffect(() => {
     const key = product?.id ?? null;
     if (key !== lastKey) {
       setQuantity(1);
+      setSelectedPriceId(null); // null → el precio 1 (Público) por defecto
       setLastKey(key);
     }
   }, [product, lastKey]);
@@ -52,19 +61,31 @@ export default function ProductSheet({product, onClose}: ProductSheetProps) {
   }
 
   const stock = product.stock;
+  const outOfStock = stock <= 0;
   const canDecrement = quantity > 1;
   const canIncrement = quantity < stock;
 
+  // Precios disponibles (por defecto 3: Público/Mayoreo/Especial)
+  const availablePrices = getProductPrices(product, priceTypes);
+  // Seleccionado: si null → precio 1 (Público), si no → el elegido
+  const selectedPrice =
+    availablePrices.find(p => p.priceType.id === selectedPriceId) ??
+    availablePrices[0];
+  const unitPrice = selectedPrice.price;
+
   /* Confirmar: construir CartItem y agregarlo al store (RF-VE-001) */
   const handleConfirm = () => {
+    if (outOfStock) {
+      return; // no permitir agregar productos agotados
+    }
     addItem({
       key: `${product.id}-${Date.now().toString(36)}`,
       product,
       quantity,
-      priceType: MOCK_PRICE_TYPE,
-      unitPrice: product.price,
+      priceType: selectedPrice.priceType,
+      unitPrice,
       discount: 0,
-      subtotal: product.price * quantity,
+      subtotal: unitPrice * quantity,
       baseQuantity: quantity * product.unit_conversion,
       isCaj: false,
     });
@@ -88,14 +109,69 @@ export default function ProductSheet({product, onClose}: ProductSheetProps) {
           {product.sku} · Stock: {stock}
         </Text>
 
+        {/* Aviso de agotado */}
+        {outOfStock && (
+          <View style={[styles.outBadge, {backgroundColor: colors.dangerSoft}]}>
+            <Text style={[styles.outText, {color: colors.danger, fontSize: fonts.small}]}>
+              Producto agotado
+            </Text>
+          </View>
+        )}
+
         <View style={[styles.priceRow, {marginTop: spacing.md}]}>
           <Text style={[styles.price, {color: colors.primary, fontSize: fonts.xlarge}]}>
-            ${product.price.toFixed(2)}
+            ${unitPrice.toFixed(2)}
           </Text>
           <Text style={[styles.unit, {color: colors.textSecondary, fontSize: fonts.small}]}>
-            / {MOCK_PRICE_TYPE.name}
+            / {selectedPrice.priceType.name}
           </Text>
         </View>
+
+        {/* Selector de tipo de precio (3 precios del producto) */}
+        {availablePrices.length > 1 && (
+          <View style={[styles.priceTypes, {marginTop: spacing.md}]}>
+            {availablePrices.map(({priceType, price}) => {
+              const isSelected = priceType.id === selectedPrice.priceType.id;
+              return (
+                <TouchableOpacity
+                  key={priceType.id}
+                  onPress={() => setSelectedPriceId(priceType.id)}
+                  style={[
+                    styles.priceChip,
+                    {
+                      borderRadius: radius.md,
+                      backgroundColor: isSelected
+                        ? colors.primary
+                        : colors.surface,
+                      borderColor: isSelected ? colors.primary : colors.border,
+                    },
+                  ]}
+                  testID={`price-${priceType.code}`}>
+                  <Text
+                    style={[
+                      styles.priceChipName,
+                      {
+                        color: isSelected ? colors.onPrimary : colors.textSecondary,
+                        fontSize: fonts.small,
+                      },
+                    ]}>
+                    {priceType.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.priceChipValue,
+                      {
+                        color: isSelected ? colors.onPrimary : colors.primary,
+                        fontSize: fonts.regular,
+                      },
+                    ]}>
+                    ${price.toFixed(2)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {/* Selector de cantidad */}
         <View style={[styles.qtyRow, {marginTop: spacing.lg}]}>
@@ -144,13 +220,14 @@ export default function ProductSheet({product, onClose}: ProductSheetProps) {
             Subtotal
           </Text>
           <Text style={[styles.totalValue, {color: colors.text, fontSize: fonts.medium}]}>
-            ${(product.price * quantity).toFixed(2)}
+            ${(unitPrice * quantity).toFixed(2)}
           </Text>
         </View>
 
         <POSButton
-          title="Agregar al carrito"
+          title={outOfStock ? 'Agotado' : 'Agregar al carrito'}
           onPress={handleConfirm}
+          disabled={outOfStock}
           large
           style={{marginTop: spacing.md}}
           testID="btn-confirm-add"
@@ -184,9 +261,28 @@ const styles = StyleSheet.create({
   },
   title: {fontWeight: '800', textAlign: 'center'},
   sku: {textAlign: 'center', marginTop: 2},
+  outBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  outText: {fontWeight: '700'},
   priceRow: {flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center'},
   price: {fontWeight: '800'},
   unit: {marginLeft: 4},
+  priceTypes: {flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap'},
+  priceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  priceChipName: {fontWeight: '600'},
+  priceChipValue: {fontWeight: '800'},
   qtyRow: {
     flexDirection: 'row',
     alignItems: 'center',

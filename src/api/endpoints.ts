@@ -19,9 +19,11 @@
  */
 import {
   AuthResponse,
+  Category,
   CreateSalePayload,
   CustomerSearchResponse,
   PrintJob,
+  PriceType,
   ProductSearchResponse,
   SaleResponse,
   ScaleReading,
@@ -78,6 +80,16 @@ export function searchProducts(
   qs.set('limit', String(params.limit ?? 20));
   qs.set('offset', String(params.offset ?? 0));
   return apiRequest<ProductSearchResponse>(`/products?${qs.toString()}`);
+}
+
+/** GET /categories — categorías activas del tenant (RF-CA-001). */
+export function getCategories(): Promise<Category[]> {
+  return apiRequest<Category[]>('/categories');
+}
+
+/** GET /price-types — tipos de precio del tenant (RF-CA-003). */
+export function getPriceTypes(): Promise<PriceType[]> {
+  return apiRequest<PriceType[]>('/price-types');
 }
 
 /* ──────────────────────────────────────────────────────────────────────

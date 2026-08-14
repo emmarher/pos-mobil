@@ -19,11 +19,13 @@ interface BottomNavBarProps {
   onChange: (tab: NavTab) => void;
   /** Badge sobre la pestaña de Caja (índice de ítems en carrito) */
   cartCount?: number;
+  /** Pestañas visibles (por permisos). Default: las 3 (Caja/Inventario/Reportes) */
+  visibleTabs?: NavTab[];
 }
 
 /** Etiquetas y emoji-icon de cada pestaña (fijos, spec 3.2) */
 const TABS: {key: NavTab; label: string; icon: string}[] = [
-  {key: 'caja', label: 'Caja', icon: '🛒'},
+  {key: 'caja', label: 'Productos', icon: '🛒'},
   {key: 'inventario', label: 'Inventario', icon: '📦'},
   {key: 'reportes', label: 'Reportes', icon: '📊'},
 ];
@@ -32,9 +34,16 @@ export default function BottomNavBar({
   active,
   onChange,
   cartCount = 0,
+  visibleTabs,
 }: BottomNavBarProps) {
   const insets = useSafeAreaInsets();
   const {colors, fonts} = useTheme();
+
+  // Filtra por permisos: si visibleTabs se pasa, solo se renderizan esas
+  // pestañas (ej. el Vendedor no ve "Reportes" → no tiene reports:read)
+  const tabs = visibleTabs
+    ? TABS.filter(tab => visibleTabs.includes(tab.key))
+    : TABS;
 
   return (
     <View
@@ -42,11 +51,11 @@ export default function BottomNavBar({
         styles.container,
         {
           paddingBottom: insets.bottom,
-          backgroundColor: colors.surface,
+          backgroundColor: colors.surfaceSolid,
           borderTopColor: colors.border,
         },
       ]}>
-      {TABS.map(tab => {
+      {tabs.map(tab => {
         const isActive = tab.key === active;
         return (
           <TouchableOpacity

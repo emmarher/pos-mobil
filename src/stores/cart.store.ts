@@ -99,7 +99,13 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   setPriceType: priceType => set({priceType}),
 
-  addItem: item => set(state => ({items: [...state.items, item]})),
+  // addItem ignora productos sin stock (guardia en el store, no solo en UI)
+  addItem: item =>
+    set(state =>
+      item.product.stock > 0
+        ? {items: [...state.items, item]}
+        : state,
+    ),
 
   updateItem: (key, patch) =>
     set(state => ({

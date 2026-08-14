@@ -26,6 +26,17 @@ import {useAuthStore} from '../stores/auth.store';
 export default function DashboardScreen() {
   const [tab, setTab] = useState<NavTab>('caja');
   const logout = useAuthStore(state => state.logout);
+  const user = useAuthStore(state => state.user);
+
+  // Reportes solo visible con permiso reports:read (el Vendedor no lo tiene)
+  const canViewReports = user?.permissions.includes('reports:read') ?? false;
+  const visibleTabs: NavTab[] = canViewReports
+    ? ['caja', 'inventario', 'reportes']
+    : ['caja', 'inventario'];
+
+  // Si el tab activo no es visible (ej. cambio de rol), renderizar Caja.
+  // NO se llama setState durante el render (evita warning de React).
+  const effectiveTab: NavTab = visibleTabs.includes(tab) ? tab : 'caja';
 
   /* Menú de usuario: cerrar sesión con confirmación (RF-AU) */
   const handleAvatarPress = () => {
@@ -42,14 +53,29 @@ export default function DashboardScreen() {
   return (
     <>
       {/* La pantalla activa gestiona fondo/header/scroll + BottomNavBar */}
-      {tab === 'caja' && (
-        <PosTerminalScreen activeTab={tab} onTabChange={setTab} onAvatarPress={handleAvatarPress} />
+      {effectiveTab === 'caja' && (
+        <PosTerminalScreen
+          activeTab={effectiveTab}
+          onTabChange={setTab}
+          onAvatarPress={handleAvatarPress}
+          visibleTabs={visibleTabs}
+        />
       )}
-      {tab === 'inventario' && (
-        <InventoryScreen activeTab={tab} onTabChange={setTab} onAvatarPress={handleAvatarPress} />
+      {effectiveTab === 'inventario' && (
+        <InventoryScreen
+          activeTab={effectiveTab}
+          onTabChange={setTab}
+          onAvatarPress={handleAvatarPress}
+          visibleTabs={visibleTabs}
+        />
       )}
-      {tab === 'reportes' && (
-        <ReportsScreen activeTab={tab} onTabChange={setTab} onAvatarPress={handleAvatarPress} />
+      {effectiveTab === 'reportes' && (
+        <ReportsScreen
+          activeTab={effectiveTab}
+          onTabChange={setTab}
+          onAvatarPress={handleAvatarPress}
+          visibleTabs={visibleTabs}
+        />
       )}
     </>
   );

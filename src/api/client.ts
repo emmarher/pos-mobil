@@ -46,15 +46,35 @@ export class NetworkError extends ApiError {
 
 /* ──────────────────────────────────────────────────────────────────────
  * 2) RESOLUCIÓN DE BASE URL
- *    Toma la IP/puerto descubiertos (server.store). Si no hay servidor
- *    configurado lanza NetworkError → la UI muestra el estado de conexión.
+ *    Toma la IP/puerto descubiertos (server.store). Si el store está
+ *    vacío (sesión restaurada sin pasar por discovery), recupera la IP
+ *    guardada en AsyncStorage. Si no hay nada → NetworkError (UI muestra
+ *    estado de conexión).
  * ────────────────────────────────────────────────────────────────────── */
-function buildBaseUrl(): string {
+async function buildBaseUrl(): Promise<string> {
   const {server} = useServerStore.getState();
-  if (!server) {
-    throw new NetworkError('Servidor no configurado');
+  if (server) {
+    return `http://${server.ip}:${server.port}`;
   }
-  return `http://${server.ip}:${server.port}`;
+  try {
+    const {STORAGE_SERVER_IP, STORAGE_SERVER_PORT} = await import(
+      '../constants/app'
+    );
+    const AsyncStorage = (await import(
+      '@react-native-async-storage/async-storage'
+    )).default;
+    const ip = await AsyncStorage.getItem(STORAGE_SERVER_IP);
+    if (ip) {
+      const port = parseInt(
+        (await AsyncStorage.getItem(STORAGE_SERVER_PORT)) ?? '3000',
+        10,
+      );
+      return `http://${ip}:${port}`;
+    }
+  } catch {
+    /* sin storage disponible */
+  }
+  throw new NetworkError('Servidor no configurado');
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -77,7 +97,7 @@ export async function apiRequest<T>(
   } = {},
 ): Promise<T> {
   const {method = 'GET', body, auth = true} = options;
-  const baseUrl = buildBaseUrl();
+  const baseUrl = await buildBaseUrl();
 
   /* a) Timeout: aborta la petición si excede HTTP_TIMEOUT_MS */
   const controller = new AbortController();
