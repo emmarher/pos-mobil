@@ -3,17 +3,18 @@
  *
  * ────────────────────────────────────────────────────────────────────────
  * El artefacto: contenedor que emula el ticket físico sobre fondo
- * traslúcido:
- *   - Encabezado de tienda + metadatos (fecha, hora, folio, cajero).
- *   - Ítems con desglose (nombre, cantidad × precio, total por ítem).
- *   - Subtotal, IVA (%) y TOTAL en indigo, peso 900.
- *   - Método de pago + código de autorización.
- *   - QR (placeholder) y borde inferior zig-zag (simula rasgado).
+ * traslúcido. Usa los datos REALES de la venta confirmada:
+ *   - SaleResponse del POST /sales (folio, subtotal, total, created_at).
+ *   - Ítems del carrito vendido (nombre, cantidad × precio, subtotal).
+ *   - Método de pago usado.
+ *   - Nombre del negocio del tenant autenticado.
  * Acciones: "Compartir" (secundario) y "Imprimir ticket" (primario).
  * ────────────────────────────────────────────────────────────────────────
  */
 import React from 'react';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import GlassBackground from '../components/GlassBackground';
 import TopAppBar from '../components/TopAppBar';
@@ -21,14 +22,29 @@ import GlassSurface from '../components/GlassSurface';
 import POSButton from '../components/POSButton';
 
 import {useTheme} from '../hooks/useTheme';
-import {MOCK_TICKET} from '../constants/mock-data';
+import {useAuthStore} from '../stores/auth.store';
+import {RootStackParamList} from '../navigation';
+
+type Route = RouteProp<RootStackParamList, 'Receipt'>;
+type Nav = NativeStackNavigationProp<RootStackParamList, 'Receipt'>;
 
 export default function ReceiptScreen() {
   const {colors, fonts, spacing} = useTheme();
+  const route = useRoute<Route>();
+  const navigation = useNavigation<Nav>();
+  const tenant = useAuthStore(state => state.tenant);
 
-  const subtotal = MOCK_TICKET.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-  const tax = subtotal * MOCK_TICKET.taxRate;
-  const total = subtotal + tax;
+  const {sale, items, paymentMethod} = route.params;
+
+  // Totales reales de la venta (fuente de verdad: el servidor)
+  const subtotal = sale.subtotal;
+  const total = sale.total;
+  const discount = sale.total_discount ?? 0;
+
+  // Metadatos: fecha/hora de la venta (created_at del servidor)
+  const created = new Date(sale.created_at);
+  const dateStr = created.toLocaleDateString('es-MX');
+  const timeStr = created.toLocaleTimeString('es-MX');
 
   const printTicket = () => {
     // TODO(Fase 5): encolar POST /print-jobs (RF-IM-002)
@@ -42,11 +58,13 @@ export default function ReceiptScreen() {
     console.log('Compartir ticket');
   };
 
+  const close = () => navigation.goBack();
+
   return (
     <GlassBackground>
       {/* TopAppBar con menú hamburguesa + logo + alerta */}
       <TopAppBar
-        title="Luxe Retail Co."
+        title={tenant?.business_name || 'POS'}
         avatarLabel="LR"
         leftSlot={
           <Text style={[styles.menuIcon, {color: colors.text}]}>☰</Text>
@@ -57,26 +75,25 @@ export default function ReceiptScreen() {
       <ScrollView contentContainerStyle={{padding: spacing.md, paddingBottom: 120, alignItems: 'center'}}>
         {/* ── Ticket emulado ─────────────────────────────────────────── */}
         <GlassSurface style={styles.ticket} elevation="raised">
-          {/* Encabezado del negocio */}
+          {/* Encabezado del negocio (del tenant autenticado) */}
           <Text style={[styles.storeName, {color: colors.text, fontSize: fonts.medium}]}>
-            {MOCK_TICKET.store.name}
+            {tenant?.business_name || 'POS'}
           </Text>
           <Text style={[styles.storeLine, {color: colors.textSecondary, fontSize: fonts.small}]}>
-            {MOCK_TICKET.store.address}
+            {tenant?.address || ''}
           </Text>
           <Text style={[styles.storeLine, {color: colors.textSecondary, fontSize: fonts.small}]}>
-            {MOCK_TICKET.store.phone}
+            {tenant?.phone || ''}
           </Text>
 
           <View style={[styles.dashed, {borderColor: colors.border}]} />
 
-          {/* Metadatos */}
+          {/* Metadatos reales de la venta */}
           {(
             [
-              ['Fecha', MOCK_TICKET.meta.date],
-              ['Hora', MOCK_TICKET.meta.time],
-              ['Folio', MOCK_TICKET.meta.folio],
-              ['Cajero', MOCK_TICKET.meta.cashier],
+              ['Fecha', dateStr],
+              ['Hora', timeStr],
+              ['Folio', sale.folio],
             ] as const
           ).map(([label, value]) => (
             <View key={label} style={styles.metaRow}>
@@ -91,18 +108,18 @@ export default function ReceiptScreen() {
 
           <View style={[styles.dashed, {borderColor: colors.border}]} />
 
-          {/* Ítems */}
-          {MOCK_TICKET.items.map(item => (
-            <View key={item.name} style={styles.itemRow}>
+          {/* Ítems vendidos (del carrito real) */}
+          {items.map(item => (
+            <View key={item.key} style={styles.itemRow}>
               <Text style={[styles.itemName, {color: colors.text, fontSize: fonts.regular}]}>
-                {item.name}
+                {item.product.name}
               </Text>
               <View style={styles.itemLine}>
                 <Text style={[styles.itemQty, {color: colors.textSecondary, fontSize: fonts.small}]}>
                   {item.quantity} × ${item.unitPrice.toFixed(2)}
                 </Text>
                 <Text style={[styles.itemTotal, {color: colors.text, fontSize: fonts.regular}]}>
-                  ${(item.quantity * item.unitPrice).toFixed(2)}
+                  ${item.subtotal.toFixed(2)}
                 </Text>
               </View>
             </View>
@@ -110,7 +127,7 @@ export default function ReceiptScreen() {
 
           <View style={[styles.dashed, {borderColor: colors.border}]} />
 
-          {/* Totales */}
+          {/* Totales reales del servidor */}
           <View style={styles.totalRow}>
             <Text style={[styles.totalLabel, {color: colors.textSecondary, fontSize: fonts.regular}]}>
               Subtotal
@@ -119,14 +136,16 @@ export default function ReceiptScreen() {
               ${subtotal.toFixed(2)}
             </Text>
           </View>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, {color: colors.textSecondary, fontSize: fonts.regular}]}>
-              IVA ({MOCK_TICKET.taxRate * 100}%)
-            </Text>
-            <Text style={[styles.totalValue, {color: colors.text, fontSize: fonts.regular}]}>
-              ${tax.toFixed(2)}
-            </Text>
-          </View>
+          {discount > 0 && (
+            <View style={styles.totalRow}>
+              <Text style={[styles.totalLabel, {color: colors.textSecondary, fontSize: fonts.regular}]}>
+                Descuento
+              </Text>
+              <Text style={[styles.totalValue, {color: colors.success, fontSize: fonts.regular}]}>
+                −${discount.toFixed(2)}
+              </Text>
+            </View>
+          )}
           <View style={[styles.grandRow, {borderTopColor: colors.border}]}>
             <Text style={[styles.grandLabel, {color: colors.text, fontSize: fonts.medium}]}>
               TOTAL
@@ -140,13 +159,10 @@ export default function ReceiptScreen() {
             </Text>
           </View>
 
-          {/* Pago */}
+          {/* Pago (método usado en la venta) */}
           <View style={styles.paymentBlock}>
             <Text style={[styles.metaLabel, {color: colors.textSecondary, fontSize: fonts.small}]}>
-              Pago: {MOCK_TICKET.payment.method}
-            </Text>
-            <Text style={[styles.metaValue, {color: colors.text, fontSize: fonts.small}]}>
-              Autorización {MOCK_TICKET.payment.authorization}
+              Pago: {paymentMethod}
             </Text>
           </View>
 
@@ -156,7 +172,7 @@ export default function ReceiptScreen() {
               ▦▦▦▦▦▦▦▦
             </Text>
             <Text style={[styles.qrSub, {color: colors.textSecondary, fontSize: fonts.micro}]}>
-              {MOCK_TICKET.meta.folio}
+              {sale.folio}
             </Text>
           </View>
         </GlassSurface>
@@ -179,6 +195,13 @@ export default function ReceiptScreen() {
           <POSButton title="Compartir" variant="secondary" onPress={shareTicket} style={styles.actionBtn} testID="btn-share" />
           <POSButton title="Imprimir ticket" onPress={printTicket} style={styles.actionBtn} testID="btn-print" />
         </View>
+        <POSButton
+          title="Volver a Productos"
+          onPress={close}
+          variant="ghost"
+          style={{marginTop: spacing.sm}}
+          testID="btn-back-products"
+        />
       </ScrollView>
     </GlassBackground>
   );

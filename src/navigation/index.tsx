@@ -22,8 +22,10 @@ import ConnectionScreen from '../screens/ConnectionScreen';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import LicenseBlockScreen from '../screens/LicenseBlockScreen';
+import ReceiptScreen from '../screens/ReceiptScreen';
 
 import {useAuthStore} from '../stores/auth.store';
+import {CartItem, SaleResponse} from '../models';
 
 /* ── 1) TIPOS DE RUTAS ──────────────────────────────────────────────── */
 export type RootStackParamList = {
@@ -31,6 +33,12 @@ export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
   LicenseBlock: undefined;
+  /** Recibo digital tras confirmar la venta (datos reales del POST /sales) */
+  Receipt: {
+    sale: SaleResponse;
+    items: CartItem[];
+    paymentMethod: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -48,8 +56,11 @@ export default function AppNavigator() {
           // Bloqueo total por licencia (CA-004): solo muestra el aviso
           <Stack.Screen name="LicenseBlock" component={LicenseBlockScreen} />
         ) : isAuthenticated ? (
-          // Sesión activa → dashboard del vendedor
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          // Sesión activa → dashboard del vendedor + recibo post-venta
+          <>
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+            <Stack.Screen name="Receipt" component={ReceiptScreen} />
+          </>
         ) : (
           // Primera configuración: discovery → login
           <>

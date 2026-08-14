@@ -21,6 +21,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import {useTheme} from '../hooks/useTheme';
 import {useCartStore} from '../stores/cart.store';
@@ -28,6 +30,9 @@ import {PaymentMethod} from '../models';
 import {createSale} from '../api/endpoints';
 import {ApiError} from '../api/client';
 import POSButton from './POSButton';
+import {RootStackParamList} from '../navigation';
+
+type Nav = NativeStackNavigationProp<RootStackParamList, 'Dashboard'>;
 
 interface CartSheetProps {
   visible: boolean;
@@ -44,6 +49,7 @@ const PAYMENT_METHODS: {method: PaymentMethod; label: string; icon: string}[] = 
 
 export default function CartSheet({visible, onClose}: CartSheetProps) {
   const {colors, fonts, spacing, radius} = useTheme();
+  const navigation = useNavigation<Nav>();
 
   const items = useCartStore(state => state.items);
   const removeItem = useCartStore(state => state.removeItem);
@@ -91,9 +97,17 @@ export default function CartSheet({visible, onClose}: CartSheetProps) {
     try {
       const payload = buildSalePayload();
       const sale = await createSale(payload);
+      // Capturar items ANTES de limpiar el carrito (para el recibo)
+      const soldItems = items;
+      const saleMethod = method;
       clearCart();
       onClose();
-      Alert.alert('Venta registrada', `Folio: ${sale.folio}`);
+      // Navegar al recibo digital con los datos REALES de la venta
+      navigation.navigate('Receipt', {
+        sale,
+        items: soldItems,
+        paymentMethod: saleMethod,
+      });
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : 'No se pudo registrar la venta.';
