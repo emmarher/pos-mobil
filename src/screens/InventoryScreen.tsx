@@ -4,14 +4,26 @@
  * ────────────────────────────────────────────────────────────────────────
  * Flujo del spec:
  *   - TopAppBar + búsqueda con botón de filtro avanzado.
- *   - KPIs: Total Items (tendencia), Agotados (alerta roja), Categorías.
- *   - Lista "Product Catalog" con imagen, nombre, SKU, stock, StatusChip.
+ *   - Chips de categoría (del servidor; mismas que en Productos).
+ *   - KPIs calculados de los productos reales: Total, Agotados, Categorías.
+ *   - Lista "Product Catalog" con nombre, SKU, stock, StatusChip.
  *   - FAB "+" para agregar producto.
- *   - BottomNavBar (Caja/Inventario/Reportes).
+ *   - BottomNavBar (Productos/Inventario/Reportes).
+ *
+ * FUENTE DE DATOS: GET /products + GET /categories (misma que la terminal).
+ * Los datos de la BD son la fuente de verdad; si el servidor no responde
+ * se muestra un mensaje de error (sin mock).
  * ────────────────────────────────────────────────────────────────────────
  */
-import React, {useMemo, useState} from 'react';
-import {ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import GlassBackground from '../components/GlassBackground';
 import TopAppBar from '../components/TopAppBar';
@@ -24,12 +36,8 @@ import Fab from '../components/Fab';
 import GlassSurface from '../components/GlassSurface';
 
 import {useTheme} from '../hooks/useTheme';
-import {
-  MOCK_CATEGORIES,
-  MOCK_INVENTORY,
-  MOCK_INVENTORY_KPIS,
-  InventoryRow,
-} from '../constants/mock-data';
+import {Category, Product} from '../models';
+import {searchProducts, getCategories} from '../api/endpoints';
 
 interface InventoryScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
@@ -42,9 +50,9 @@ interface InventoryScreenProps {
 }
 
 /** Deriva el status de stock (umbral min_stock; spec 3.8) */
-function stockStatus(row: InventoryRow): StockStatus {
-  if (row.stock <= 0) return 'out_of_stock';
-  if (row.stock <= row.minStock) return 'low_stock';
+function stockStatus(p: Product): StockStatus {
+  if (p.stock <= 0) return 'out_of_stock';
+  if (p.stock <= p.min_stock) return 'low_stock';
   return 'in_stock';
 }
 
@@ -59,15 +67,55 @@ export default function InventoryScreen({
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
 
+  // Productos y categorías reales (fuente de verdad: BD vía API)
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  /* ── Carga: GET /products + /categories (igual que la terminal) ──── */
+  const loadInventory = useCallback(async () => {
+    setLoading(true);
+    // limit 50 = máximo del backend (RF-CA-006: 20, el servicio permite 50)
+    const prodRes = await searchProducts({limit: 50}).catch(() => null);
+    const cats = await getCategories().catch(() => null);
+    if (prodRes) {
+      setProducts(prodRes.items);
+    }
+    if (cats) {
+      setCategories(cats);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void loadInventory();
+  }, [loadInventory]);
+
+  /* ── KPIs calculados de los datos reales ─────────────────────────── */
+  const kpis = useMemo(() => {
+    const outOfStock = products.filter(p => p.stock <= 0).length;
+    const catCount = categories.length;
+    return {
+      totalItems: products.length.toLocaleString('es-MX'),
+      totalItemsTrend: '',
+      outOfStock: String(outOfStock),
+      categories: `${catCount} ${catCount === 1 ? 'activa' : 'activas'}`,
+    };
+  }, [products, categories]);
+
+  /* ── Filtrado: búsqueda + categoría ──────────────────────────────── */
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MOCK_INVENTORY.filter(r => {
-      const matchCat = activeCategory === 'all' || r.category_id === activeCategory;
+    return products.filter(p => {
+      const matchCat = activeCategory === 'all' || p.category_id === activeCategory;
       const matchQ =
-        !q || r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q);
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.sku ?? '').toLowerCase().includes(q) ||
+        (p.internal_code ?? '').toLowerCase().includes(q);
       return matchCat && matchQ;
     });
-  }, [query, activeCategory]);
+  }, [products, query, activeCategory]);
 
   return (
     <GlassBackground>
@@ -92,9 +140,15 @@ export default function InventoryScreen({
           </TouchableOpacity>
         </View>
 
-        {/* Chips de categoría (filtrado del catálogo) */}
+        {/* Chips de categoría (del servidor, mismas que en Productos) */}
         <View style={[styles.chips, {marginTop: spacing.sm}]}>
-          {MOCK_CATEGORIES.map(cat => (
+          <FilterChip
+            label="Todos"
+            active={activeCategory === 'all'}
+            onPress={() => setActiveCategory('all')}
+            testID="inv-chip-all"
+          />
+          {categories.map(cat => (
             <FilterChip
               key={cat.id}
               label={cat.name}
@@ -105,25 +159,25 @@ export default function InventoryScreen({
           ))}
         </View>
 
-        {/* KPIs: Total Items / Agotados / Categorías */}
+        {/* KPIs calculados de los datos reales */}
         <View style={[styles.kpiRow, {marginTop: spacing.md}]}>
           <KpiCard
             label="Total items"
-            value={MOCK_INVENTORY_KPIS.totalItems}
-            trend={MOCK_INVENTORY_KPIS.totalItemsTrend}
+            value={kpis.totalItems}
+            trend={kpis.totalItemsTrend}
             style={styles.kpi}
             testID="kpi-total"
           />
           <KpiCard
             label="Agotados"
-            value={MOCK_INVENTORY_KPIS.outOfStock}
-            alert
+            value={kpis.outOfStock}
+            alert={Number(kpis.outOfStock) > 0}
             style={styles.kpi}
             testID="kpi-outofstock"
           />
           <KpiCard
             label="Categorías"
-            value={MOCK_INVENTORY_KPIS.categories}
+            value={kpis.categories}
             style={styles.kpi}
             testID="kpi-categories"
           />
@@ -136,24 +190,37 @@ export default function InventoryScreen({
           Catálogo de productos
         </Text>
 
-        {filtered.map(row => (
-          <GlassSurface key={row.id} style={styles.rowCard}>
-            <View style={[styles.thumb, {backgroundColor: colors.primarySoft}]}>
-              <Text style={[styles.thumbText, {color: colors.primary}]}>
-                {row.name.charAt(0)}
-              </Text>
-            </View>
-            <View style={styles.rowInfo}>
-              <Text numberOfLines={1} style={[styles.rowName, {color: colors.text, fontSize: fonts.regular}]}>
-                {row.name}
-              </Text>
-              <Text style={[styles.rowSku, {color: colors.textSecondary, fontSize: fonts.small}]}>
-                {row.sku} · Stock: {row.stock}
-              </Text>
-            </View>
-            <StatusChip status={stockStatus(row)} testID={`status-${row.id}`} />
-          </GlassSurface>
-        ))}
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, {color: colors.textSecondary, fontSize: fonts.small}]}>
+              Cargando inventario…
+            </Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <Text style={[styles.empty, {color: colors.textSecondary, fontSize: fonts.regular}]}>
+            No hay productos para «{query}» o el servidor no está disponible
+          </Text>
+        ) : (
+          filtered.map(p => (
+            <GlassSurface key={p.id} style={styles.rowCard}>
+              <View style={[styles.thumb, {backgroundColor: colors.primarySoft}]}>
+                <Text style={[styles.thumbText, {color: colors.primary}]}>
+                  {p.name.charAt(0)}
+                </Text>
+              </View>
+              <View style={styles.rowInfo}>
+                <Text numberOfLines={1} style={[styles.rowName, {color: colors.text, fontSize: fonts.regular}]}>
+                  {p.name}
+                </Text>
+                <Text style={[styles.rowSku, {color: colors.textSecondary, fontSize: fonts.small}]}>
+                  {p.sku ?? p.internal_code} · Stock: {p.stock}
+                </Text>
+              </View>
+              <StatusChip status={stockStatus(p)} testID={`status-${p.id}`} />
+            </GlassSurface>
+          ))
+        )}
       </ScrollView>
 
       {/* FAB + para agregar producto */}
@@ -201,5 +268,8 @@ const styles = StyleSheet.create({
   rowInfo: {flex: 1, marginRight: 8},
   rowName: {fontWeight: '600'},
   rowSku: {fontWeight: '500', marginTop: 2},
+  loading: {alignItems: 'center', paddingTop: 32},
+  loadingText: {marginTop: 8, fontWeight: '600'},
+  empty: {textAlign: 'center', paddingTop: 32},
   bottomNav: {position: 'absolute', bottom: 0, left: 0, right: 0},
 });
