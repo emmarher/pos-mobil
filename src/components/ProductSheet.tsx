@@ -235,7 +235,7 @@ export default function ProductSheet({
         <POSButton
           title="Cancelar"
           onPress={onClose}
-          variant="ghost"
+          variant="danger"
           style={{marginTop: spacing.sm}}
           testID="btn-cancel-add"
         />

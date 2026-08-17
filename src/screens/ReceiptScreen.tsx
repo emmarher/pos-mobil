@@ -69,7 +69,6 @@ export default function ReceiptScreen() {
         leftSlot={
           <Text style={[styles.menuIcon, {color: colors.text}]}>☰</Text>
         }
-        notificationCount={1}
       />
 
       <ScrollView contentContainerStyle={{padding: spacing.md, paddingBottom: 120, alignItems: 'center'}}>

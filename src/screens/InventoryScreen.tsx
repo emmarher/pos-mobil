@@ -36,8 +36,10 @@ import Fab from '../components/Fab';
 import GlassSurface from '../components/GlassSurface';
 
 import {useTheme} from '../hooks/useTheme';
+import {useAuthStore} from '../stores/auth.store';
 import {Category, Product} from '../models';
 import {searchProducts, getCategories} from '../api/endpoints';
+import ProductFormSheet from '../components/ProductFormSheet';
 
 interface InventoryScreenProps {
   /** Pestaña activa (controlada por DashboardScreen) */
@@ -66,11 +68,17 @@ export default function InventoryScreen({
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  // Formulario de nuevo producto (solo con permiso products:create)
+  const [formVisible, setFormVisible] = useState(false);
 
   // Productos y categorías reales (fuente de verdad: BD vía API)
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Permiso para crear productos (el Vendedor no lo tiene → sin FAB)
+  const user = useAuthStore(state => state.user);
+  const canCreateProduct = user?.permissions.includes('products:create') ?? false;
 
   /* ── Carga: GET /products + /categories (igual que la terminal) ──── */
   const loadInventory = useCallback(async () => {
@@ -119,7 +127,7 @@ export default function InventoryScreen({
 
   return (
     <GlassBackground>
-      <TopAppBar title="Inventario" notificationCount={1} onAvatarPress={onAvatarPress} />
+      <TopAppBar title="Inventario" onAvatarPress={onAvatarPress} />
 
       {/* Búsqueda + filtro avanzado */}
       <View style={styles.header}>
@@ -223,8 +231,21 @@ export default function InventoryScreen({
         )}
       </ScrollView>
 
-      {/* FAB + para agregar producto */}
-      <Fab variant="add" onPress={() => console.log('Nuevo producto')} testID="fab-add-product" />
+      {/* FAB + para agregar producto (solo con permiso products:create) */}
+      {canCreateProduct && (
+        <Fab
+          variant="add"
+          onPress={() => setFormVisible(true)}
+          testID="fab-add-product"
+        />
+      )}
+
+      {/* Formulario de nuevo producto */}
+      <ProductFormSheet
+        visible={formVisible}
+        onClose={() => setFormVisible(false)}
+        onCreated={loadInventory}
+      />
 
       {/* Navegación inferior (controlada por el Dashboard) */}
       <View style={styles.bottomNav}>

@@ -118,7 +118,7 @@ export default function PosTerminalScreen({
 
   return (
     <GlassBackground>
-      <TopAppBar title="Terminal de ventas" notificationCount={2} onAvatarPress={onAvatarPress} />
+      <TopAppBar title="Terminal de ventas" onAvatarPress={onAvatarPress} />
 
       {/* Búsqueda + categorías */}
       <View style={styles.header}>

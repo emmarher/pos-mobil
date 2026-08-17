@@ -5,7 +5,7 @@
  * Contenido:
  *   - Avatar circular con iniciales (ej. "UP").
  *   - Título de la pantalla.
- *   - Acciones a la derecha (notificación con badge de alerta).
+ * (La notificación 🔔 está deshabilitada/comentada.)
  * Altura 64px + safe-area-inset-top; fondo glass con borde inferior sutil.
  * ────────────────────────────────────────────────────────────────────────
  */
@@ -24,12 +24,7 @@ interface TopAppBarProps {
   title: string;
   /** Iniciales del cajero (avatar, ej. "UP") */
   avatarLabel?: string;
-  /** Muestra el ícono de notificación */
-  showNotification?: boolean;
-  /** Badge numérico de la notificación */
-  notificationCount?: number;
   onAvatarPress?: () => void;
-  onNotificationPress?: () => void;
   /** Elemento izquierdo alternativo (menú hamburguesa, back) */
   leftSlot?: React.ReactNode;
   style?: ViewStyle;
@@ -38,10 +33,7 @@ interface TopAppBarProps {
 export default function TopAppBar({
   title,
   avatarLabel = 'UP',
-  showNotification = true,
-  notificationCount = 0,
   onAvatarPress,
-  onNotificationPress,
   leftSlot,
   style,
 }: TopAppBarProps) {
@@ -79,8 +71,9 @@ export default function TopAppBar({
       </View>
 
       {/* Acciones a la derecha */}
-      <View style={styles.actions}>
-        {showNotification && (
+      {/* NOTIFICACIÓN DESHABILITADA (se elimina el ícono 🔔 del navbar).
+      {showNotification && (
+        <View style={styles.actions}>
           <TouchableOpacity
             onPress={onNotificationPress}
             style={styles.notificationBtn}
@@ -94,8 +87,9 @@ export default function TopAppBar({
               </View>
             )}
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
+      */}
     </View>
   );
 }

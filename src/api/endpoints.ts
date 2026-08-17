@@ -22,8 +22,10 @@ import {
   Category,
   CreateSalePayload,
   CustomerSearchResponse,
+  MeasurementUnit,
   PrintJob,
   PriceType,
+  Product,
   ProductSearchResponse,
   SaleResponse,
   ScaleReading,
@@ -80,6 +82,48 @@ export function searchProducts(
   qs.set('limit', String(params.limit ?? 20));
   qs.set('offset', String(params.offset ?? 0));
   return apiRequest<ProductSearchResponse>(`/products?${qs.toString()}`);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * CREACIÓN DE PRODUCTOS (RF-CA-002) — solo con permiso products:create
+ * ────────────────────────────────────────────────────────────────────── */
+
+/** Precio de un tipo de precio al crear el producto (RF-CA-004). */
+export interface ProductInputPrices {
+  price_type_id: string;
+  price: number;
+  min_quantity?: number;
+}
+
+/** Body de POST /products (espejo de productCreateBodySchema del backend). */
+export interface CreateProductInput {
+  name: string;
+  category_id?: string | null;
+  description?: string | null;
+  barcode?: string | null;
+  internal_code?: string | null;
+  sku?: string | null;
+  base_unit_id: string;
+  sale_unit_id: string;
+  unit_conversion?: number;
+  price?: number;
+  cost?: number;
+  min_stock?: number;
+  max_stock?: number | null;
+  is_scale_enabled?: boolean;
+  allow_fractional_sale?: boolean;
+  is_active?: boolean;
+  prices?: ProductInputPrices[];
+}
+
+/** POST /products — crea producto + precios (permiso products:create). */
+export function createProduct(input: CreateProductInput): Promise<Product> {
+  return apiRequest<Product>('/products', {method: 'POST', body: input});
+}
+
+/** GET /measurement-units — unidades de medida del catálogo (RF-UM). */
+export function getMeasurementUnits(): Promise<MeasurementUnit[]> {
+  return apiRequest<MeasurementUnit[]>('/measurement-units');
 }
 
 /** GET /categories — categorías activas del tenant (RF-CA-001). */
