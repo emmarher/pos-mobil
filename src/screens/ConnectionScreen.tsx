@@ -17,7 +17,7 @@
  *   3) Acciones manuales (IP manual, QR)
  *   4) Render (UI)
  */
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Alert,
   StyleSheet,
@@ -63,10 +63,18 @@ export default function ConnectionScreen() {
   /**
    * Ejecuta el discovery (IP guardada → UDP → etc.). Si encuentra el
    * servidor, avanza a la pantalla de Login.
+   * Guard con useRef: evita disparos en paralelo y el bucle rápido que
+   * reiniciaba el efecto por el cambio de `searching`.
    */
+  const searchingRef = useRef(false);
   const runDiscovery = useCallback(async () => {
+    if (searchingRef.current) {
+      return; // ya hay una búsqueda en curso
+    }
+    searchingRef.current = true;
     setSearching(true);
     const found = await discoverServer();
+    searchingRef.current = false;
     setSearching(false);
     if (found) {
       // TODO: aquí se validaría el tenant y se pasa a Login.
@@ -75,13 +83,12 @@ export default function ConnectionScreen() {
   }, [navigation]);
 
   /**
-   * Efecto de reintento: mientras el servidor no esté conectado y no
-   * haya una búsqueda en curso, corre discovery y programa un interval
-   * de SERVER_RETRY_MS (5s). La bandera `cancelled` evita fugas al
-   * desmontar / cambiar de estado.
+   * Efecto de reintento: corre discovery una vez al montar y programa un
+   * interval de SERVER_RETRY_MS (5s). NO depende de `searching` (eso
+   * causaba un bucle inmediato); usa una ref para evitar solapamientos.
    */
   useEffect(() => {
-    if (status === 'connected' || searching) {
+    if (status === 'connected') {
       return;
     }
     let cancelled = false;
@@ -95,7 +102,7 @@ export default function ConnectionScreen() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [status, searching, runDiscovery]);
+  }, [status, runDiscovery]);
 
   /* ── 3) ACCIONES MANUALES (RF-DS-004 QR RF-DS-003) ───────────────── */
 

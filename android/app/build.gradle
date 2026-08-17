@@ -20,8 +20,10 @@ react {
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "liteDebugOptimized", "prodDebug", "prodDebugOptimized"]
+    //   Si NO se listan variantes debuggable, TODAS embeven el bundle JS.
+    //   Para que el APK debug funcione instalado SIN Metro (dispositivo físico),
+    //   se deja la lista vacía → el bundle se embebe en el APK.
+    debuggableVariants = []
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
