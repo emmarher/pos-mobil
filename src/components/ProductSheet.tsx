@@ -11,6 +11,7 @@
  */
 import React, {useState} from 'react';
 import {
+  Alert,
   Modal,
   StyleSheet,
   Text,
@@ -45,6 +46,8 @@ export default function ProductSheet({
   const [lastKey, setLastKey] = useState<string | null>(null);
   // Precio seleccionado (default: precio 1 = Público)
   const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
+  // Aviso inline no bloqueante (auto-ajustes de cantidad por min_quantity)
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Reset cantidad + precio cuando cambia el producto (o al cerrar)
   React.useEffect(() => {
@@ -52,6 +55,7 @@ export default function ProductSheet({
     if (key !== lastKey) {
       setQuantity(1);
       setSelectedPriceId(null); // null → el precio 1 (Público) por defecto
+      setNotice(null);
       setLastKey(key);
     }
   }, [product, lastKey]);
@@ -92,6 +96,46 @@ export default function ProductSheet({
     onClose();
   };
 
+  /**
+   * Seleccionar tipo de precio respetando min_quantity: si el stock no
+   * alcanza al mínimo se bloquea (Alert); si la cantidad es menor, se
+   * auto-suben las piezas necesarias (aviso inline). Sin esto el servidor
+   * recalcularía con el precio base y el cobro no cubriría el total.
+   */
+  const handleSelectPrice = (
+    option: {priceType: PriceType; price: number; minQuantity: number},
+  ) => {
+    if (option.minQuantity > stock) {
+      Alert.alert(
+        'Cantidad insuficiente',
+        `${option.priceType.name} aplica desde ${option.minQuantity} piezas y solo hay ${stock}.`,
+      );
+      return;
+    }
+    setSelectedPriceId(option.priceType.id);
+    if (quantity < option.minQuantity) {
+      setQuantity(option.minQuantity);
+      setNotice(
+        `${option.priceType.name} aplica desde ${option.minQuantity} pzas`,
+      );
+    } else {
+      setNotice(null);
+    }
+  };
+
+  /** Decrementar cantidad: si baja del mínimo del tipo activo, vuelve a Público. */
+  const handleDecrement = () => {
+    const next = Math.max(1, quantity - 1);
+    if (next < selectedPrice.minQuantity && selectedPriceId !== null) {
+      // Bajar del mínimo del tipo elegido → revertir al precio base (Público)
+      setSelectedPriceId(null);
+      setNotice(
+        `Cantidad mínima para ${selectedPrice.priceType.name}: ${selectedPrice.minQuantity} pzas`,
+      );
+    }
+    setQuantity(next);
+  };
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -127,15 +171,23 @@ export default function ProductSheet({
           </Text>
         </View>
 
+        {/* Aviso inline (auto-ajuste por min_quantity) */}
+        {notice && (
+          <Text
+            style={[styles.notice, {color: colors.textSecondary, fontSize: fonts.small}]}>
+            ⓘ {notice}
+          </Text>
+        )}
+
         {/* Selector de tipo de precio (3 precios del producto) */}
         {availablePrices.length > 1 && (
           <View style={[styles.priceTypes, {marginTop: spacing.md}]}>
-            {availablePrices.map(({priceType, price}) => {
-              const isSelected = priceType.id === selectedPrice.priceType.id;
+            {availablePrices.map(option => {
+              const isSelected = option.priceType.id === selectedPrice.priceType.id;
               return (
                 <TouchableOpacity
-                  key={priceType.id}
-                  onPress={() => setSelectedPriceId(priceType.id)}
+                  key={option.priceType.id}
+                  onPress={() => handleSelectPrice(option)}
                   style={[
                     styles.priceChip,
                     {
@@ -144,9 +196,10 @@ export default function ProductSheet({
                         ? colors.primary
                         : colors.surface,
                       borderColor: isSelected ? colors.primary : colors.border,
+                      opacity: option.minQuantity > stock ? 0.5 : 1,
                     },
                   ]}
-                  testID={`price-${priceType.code}`}>
+                  testID={`price-${option.priceType.code}`}>
                   <Text
                     style={[
                       styles.priceChipName,
@@ -155,7 +208,7 @@ export default function ProductSheet({
                         fontSize: fonts.small,
                       },
                     ]}>
-                    {priceType.name}
+                    {option.priceType.name}
                   </Text>
                   <Text
                     style={[
@@ -165,7 +218,8 @@ export default function ProductSheet({
                         fontSize: fonts.regular,
                       },
                     ]}>
-                    ${price.toFixed(2)}
+                    ${option.price.toFixed(2)}
+                    {option.minQuantity > 1 ? ` · ${option.minQuantity}+` : ''}
                   </Text>
                 </TouchableOpacity>
               );
@@ -176,7 +230,7 @@ export default function ProductSheet({
         {/* Selector de cantidad */}
         <View style={[styles.qtyRow, {marginTop: spacing.lg}]}>
           <TouchableOpacity
-            onPress={() => setQuantity(q => Math.max(1, q - 1))}
+            onPress={handleDecrement}
             disabled={!canDecrement}
             style={[
               styles.qtyBtn,
@@ -269,6 +323,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   outText: {fontWeight: '700'},
+  notice: {textAlign: 'center', marginTop: 6, fontWeight: '600'},
   priceRow: {flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center'},
   price: {fontWeight: '800'},
   unit: {marginLeft: 4},

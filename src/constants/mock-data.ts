@@ -102,7 +102,7 @@ function round2(n: number): number {
 export function getProductPrices(
   product: Product,
   priceTypes?: PriceType[],
-): {priceType: PriceType; price: number}[] {
+): {priceType: PriceType; price: number; minQuantity: number}[] {
   const types = priceTypes && priceTypes.length > 0 ? priceTypes : MOCK_PRICE_TYPES;
   if (product.prices && product.prices.length > 0) {
     return product.prices.map(pp => {
@@ -117,10 +117,12 @@ export function getProductPrices(
           is_default: false,
           display_order: 0,
         } as PriceType);
-      return {priceType, price: pp.price};
+      // min_quantity: el servidor NO aplica un precio si quantity < min_quantity
+      // (hace fallback silencioso al precio base) — el cliente debe respetarlo.
+      return {priceType, price: pp.price, minQuantity: pp.min_quantity ?? 1};
     });
   }
-  return [{priceType: types[0], price: product.price}];
+  return [{priceType: types[0], price: product.price, minQuantity: 1}];
 }
 
 /** Catálogo del terminal de ventas (grid 2 columnas) */
