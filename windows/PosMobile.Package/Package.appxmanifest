@@ -12,7 +12,7 @@
     Version="1.0.0.0" />
 
   <Properties>
-    <DisplayName>PosMobile</DisplayName>
+    <DisplayName>Sistema POS</DisplayName>
     <PublisherDisplayName>emanuel</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
   </Properties>
@@ -31,8 +31,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="PosMobile"
-        Description="PosMobile"
+        DisplayName="Sistema POS"
+        Description="Sistema Punto de Venta v4"
         BackgroundColor="transparent"
         Square150x150Logo="Images\Square150x150Logo.png"
         Square44x44Logo="Images\Square44x44Logo.png">
@@ -44,6 +44,8 @@
 
   <Capabilities>
     <Capability Name="internetClient" />
+    <!-- Red local privada: UDP "POS_DISCOVER":5000 y HTTP local a pos-server -->
+    <Capability Name="privateNetworkClientServer" />
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
 </Package>

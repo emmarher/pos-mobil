@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="ProbeProps" AfterTargets="Build">
+    <Message Importance="high" Text="PROBE_PLATFORM= $(Platform)" />
+    <Message Importance="high" Text="PROBE_HERMESPLATFORM= $(HermesPlatform)" />
+    <Message Importance="high" Text="PROBE_HERMESAPPP= $(HermesAppPlatform)" />
+    <Message Importance="high" Text="PROBE_IXPP= $(Ixp-Platform)" />
+    <Message Importance="high" Text="PROBE_WASDFOUND= $(_WindowsAppSDKFoundationPlatform)" />
+    <Message Importance="high" Text="PROBE_MRT= $(_MrtCoreRuntimeIdentifier)" />
+    <Message Importance="high" Text="PROBE_INTDIR= $(IntDir)" />
+    <Message Importance="high" Text="PROBE_OUTDIR= $(OutDir)" />
+  </Target>
+</Project>

@@ -79,5 +79,7 @@ windows/**/x64/
 windows/**/Debug/
 windows/**/Release/
 windows/.vs/
+# Paquetes NuGet restaurables (no versionar binarios)
+windows/packages/
 *.suo
 *.user
