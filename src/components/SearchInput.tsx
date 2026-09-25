@@ -16,6 +16,8 @@ interface SearchInputProps {
   onChangeText: (text: string) => void;
   style?: ViewStyle;
   testID?: string;
+  /** Ref al TextInput interno (para atajos de teclado en escritorio). */
+  inputRef?: React.RefObject<TextInput | null>;
 }
 
 export default function SearchInput({
@@ -24,6 +26,7 @@ export default function SearchInput({
   onChangeText,
   style,
   testID,
+  inputRef,
 }: SearchInputProps) {
   const {colors, fonts, radius} = useTheme();
 
@@ -40,6 +43,7 @@ export default function SearchInput({
       ]}>
       <Text style={[styles.icon, {color: colors.textSecondary}]}>🔍</Text>
       <TextInput
+        ref={inputRef}
         testID={testID}
         style={[styles.input, {color: colors.text, fontSize: fonts.regular}]}
         placeholder={placeholder}

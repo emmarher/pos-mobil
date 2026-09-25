@@ -21,12 +21,12 @@ import {
   View,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import POSButton from '../components/POSButton';
 import GlassBackground from '../components/GlassBackground';
 import GlassSurface from '../components/GlassSurface';
-import {RootStackParamList} from '../navigation';
+import type {RootStackParamList} from '../navigation';
 import {useTheme} from '../hooks/useTheme';
 import {useAuthStore} from '../stores/auth.store';
 import {login} from '../api/endpoints';
@@ -192,7 +192,8 @@ export default function LoginScreen() {
 /* ── Estilos de la pantalla ─────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: {flex: 1},
-  content: {flex: 1, justifyContent: 'center'},
+  // maxWidth centrado: en escritorio (ventana ancha) el formulario no se estira
+  content: {flex: 1, justifyContent: 'center', alignSelf: 'center', width: '100%', maxWidth: 480},
   brand: {alignItems: 'center', marginBottom: 32},
   logo: {
     width: 88,

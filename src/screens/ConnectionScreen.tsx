@@ -27,12 +27,12 @@ import {
   ScrollView,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import POSButton from '../components/POSButton';
 import GlassBackground from '../components/GlassBackground';
 import GlassSurface from '../components/GlassSurface';
-import {RootStackParamList} from '../navigation';
+import type {RootStackParamList} from '../navigation';
 import {useTheme} from '../hooks/useTheme';
 import {useServerStore} from '../stores/server.store';
 import {discoverServer, applyServer} from '../api/discovery';
@@ -126,7 +126,10 @@ export default function ConnectionScreen() {
     <GlassBackground>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.content, {padding: spacing.lg}]}>
+        contentContainerStyle={[
+          styles.content,
+          {padding: spacing.lg},
+        ]}>
         {/* Encabezado */}
         <Text style={[styles.title, {color: colors.text, fontSize: fonts.xxlarge}]}>
           Sistema POS
@@ -230,7 +233,8 @@ export default function ConnectionScreen() {
 /* ── Estilos de la pantalla ─────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: {flex: 1},
-  content: {justifyContent: 'center'},
+  // maxWidth centrado: en escritorio la tarjeta no se estira a lo ancho
+  content: {justifyContent: 'center', alignSelf: 'center', width: '100%', maxWidth: 520},
   title: {textAlign: 'center', fontWeight: '800', marginTop: 32},
   subtitle: {textAlign: 'center', marginVertical: 12},
   banner: {borderRadius: 12, padding: 16, marginVertical: 12},

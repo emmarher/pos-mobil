@@ -22,6 +22,7 @@ import {enableScreens} from 'react-native-screens';
 import AppNavigator from './src/navigation';
 import {useAuthStore} from './src/stores/auth.store';
 import {posTheme, ThemeMode} from './src/constants/theme';
+import {applyWindowConfig} from './src/native/window';
 
 // Activa navegación nativa optimizada (react-native-screens)
 enableScreens();
@@ -42,7 +43,9 @@ function App() {
       await restoreSession();
       await validateLicense();
     })();
-  }, [restoreSession, validateLicense]);
+    // Ventana nativa (Windows): título, tamaño mínimo y colores del TitleBar
+    applyWindowConfig(theme);
+  }, [restoreSession, validateLicense, theme]);
 
   /* ── 2) RENDER: CONTENEDORES RAÍZ + NAVEGADOR ────────────────────── */
 

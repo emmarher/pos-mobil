@@ -25,21 +25,9 @@ import LicenseBlockScreen from '../screens/LicenseBlockScreen';
 import ReceiptScreen from '../screens/ReceiptScreen';
 
 import {useAuthStore} from '../stores/auth.store';
-import {CartItem, SaleResponse} from '../models';
+import {RootStackParamList} from './types';
 
-/* ── 1) TIPOS DE RUTAS ──────────────────────────────────────────────── */
-export type RootStackParamList = {
-  Connection: undefined;
-  Login: undefined;
-  Dashboard: undefined;
-  LicenseBlock: undefined;
-  /** Recibo digital tras confirmar la venta (datos reales del POST /sales) */
-  Receipt: {
-    sale: SaleResponse;
-    items: CartItem[];
-    paymentMethod: string;
-  };
-};
+export type {RootStackParamList} from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

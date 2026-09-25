@@ -14,7 +14,7 @@
 import React from 'react';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import GlassBackground from '../components/GlassBackground';
 import TopAppBar from '../components/TopAppBar';
@@ -23,7 +23,7 @@ import POSButton from '../components/POSButton';
 
 import {useTheme} from '../hooks/useTheme';
 import {useAuthStore} from '../stores/auth.store';
-import {RootStackParamList} from '../navigation';
+import type {RootStackParamList} from '../navigation';
 
 type Route = RouteProp<RootStackParamList, 'Receipt'>;
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Receipt'>;

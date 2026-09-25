@@ -12,6 +12,7 @@
 import React, {useState} from 'react';
 import {
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -24,6 +25,7 @@ import {PriceType, Product} from '../models';
 import {getProductPrices} from '../constants/mock-data';
 import {useCartStore} from '../stores/cart.store';
 import POSButton from './POSButton';
+import DesktopDialog from './DesktopDialog';
 
 interface ProductSheetProps {
   product: Product | null;
@@ -92,19 +94,12 @@ export default function ProductSheet({
     onClose();
   };
 
-  return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
-      </TouchableWithoutFeedback>
-
-      <View style={[styles.sheet, {backgroundColor: colors.surfaceSolid}]}>
-        {/* Manija */}
-        <View style={[styles.handle, {backgroundColor: colors.border}]} />
-
-        <Text style={[styles.title, {color: colors.text, fontSize: fonts.medium}]}>
-          {product.name}
-        </Text>
+  // Cuerpo compartido entre la hoja móvil y el diálogo de escritorio
+  const body = (
+    <>
+      <Text style={[styles.title, {color: colors.text, fontSize: fonts.medium}]}>
+        {product.name}
+      </Text>
         <Text style={[styles.sku, {color: colors.textSecondary, fontSize: fonts.small}]}>
           {product.sku} · Stock: {stock}
         </Text>
@@ -239,6 +234,29 @@ export default function ProductSheet({
           style={{marginTop: spacing.sm}}
           testID="btn-cancel-add"
         />
+    </>
+  );
+
+  // Escritorio: diálogo centrado con fade (WINDOWS_PLAN §5.2)
+  if (Platform.OS === 'windows' || Platform.OS === 'macos') {
+    return (
+      <DesktopDialog visible onClose={onClose} onEnter={handleConfirm}>
+        {body}
+      </DesktopDialog>
+    );
+  }
+
+  // Móvil/tablet: hoja inferior (spec 3.x)
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.backdrop} />
+      </TouchableWithoutFeedback>
+
+      <View style={[styles.sheet, {backgroundColor: colors.surfaceSolid}]}>
+        {/* Manija */}
+        <View style={[styles.handle, {backgroundColor: colors.border}]} />
+        {body}
       </View>
     </Modal>
   );

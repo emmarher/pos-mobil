@@ -68,7 +68,7 @@ export default function POSButton({
       testID={testID}
       onPress={onPress}
       disabled={isDisabled}
-      style={({pressed}) => [
+      style={(state: {pressed: boolean; hovered?: boolean}) => [
         styles.base,
         {
           backgroundColor: variantColors.bg,
@@ -77,7 +77,14 @@ export default function POSButton({
           borderRadius: radius.md,
           paddingVertical: large ? spacing.lg : spacing.md,
           paddingHorizontal: large ? spacing.xl : spacing.lg,
-          opacity: pressed ? 0.85 : isDisabled ? 0.5 : 1,
+          // Estados: hover (ratón/escritorio) aclara sutilmente; pressed oscurece
+          opacity: isDisabled
+            ? 0.5
+            : state.pressed
+            ? 0.85
+            : state.hovered
+            ? 0.92
+            : 1,
         },
         style,
       ]}>

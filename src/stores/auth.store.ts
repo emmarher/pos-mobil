@@ -20,6 +20,7 @@
 import {create} from 'zustand';
 import * as Keychain from 'react-native-keychain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Platform} from 'react-native';
 
 import {AuthResponse} from '../models';
 import {
@@ -78,6 +79,11 @@ export interface AuthState {
  *    para Windows donde keychain no está disponible).
  * ────────────────────────────────────────────────────────────────────── */
 async function storeTokens(tokens: PersistedTokens) {
+  // Windows/macOS: sin keychain nativo → AsyncStorage directo (fallback).
+  if (Platform.OS === 'windows' || Platform.OS === 'macos') {
+    await AsyncStorage.setItem(KEYCHAIN_AUTH, JSON.stringify(tokens));
+    return;
+  }
   try {
     await Keychain.setGenericPassword('pos', JSON.stringify(tokens), {
       service: KEYCHAIN_AUTH,
@@ -90,13 +96,16 @@ async function storeTokens(tokens: PersistedTokens) {
 }
 
 async function readTokens(): Promise<PersistedTokens | null> {
-  try {
-    const creds = await Keychain.getGenericPassword({service: KEYCHAIN_AUTH});
-    if (creds) {
-      return JSON.parse(creds.password) as PersistedTokens;
+  // Windows/macOS: leer directo de AsyncStorage (no hay keychain).
+  if (Platform.OS !== 'windows' && Platform.OS !== 'macos') {
+    try {
+      const creds = await Keychain.getGenericPassword({service: KEYCHAIN_AUTH});
+      if (creds) {
+        return JSON.parse(creds.password) as PersistedTokens;
+      }
+    } catch {
+      // Si keychain falla, probamos el fallback de AsyncStorage.
     }
-  } catch {
-    // Si keychain falla, probamos el fallback de AsyncStorage.
   }
   const raw = await AsyncStorage.getItem(KEYCHAIN_AUTH);
   return raw ? (JSON.parse(raw) as PersistedTokens) : null;
@@ -252,10 +261,13 @@ export const useAuthStore = create<AuthState>(set => ({
   /* ── Cerrar sesión: limpiar tokens y estado ─────────────────────── */
 
   logout: async () => {
-    try {
-      await Keychain.resetGenericPassword({service: KEYCHAIN_AUTH});
-    } catch {
-      /* ignore */
+    // Windows/macOS: sin keychain → solo limpiar AsyncStorage.
+    if (Platform.OS !== 'windows' && Platform.OS !== 'macos') {
+      try {
+        await Keychain.resetGenericPassword({service: KEYCHAIN_AUTH});
+      } catch {
+        /* ignore */
+      }
     }
     await AsyncStorage.removeItem(KEYCHAIN_AUTH);
     await AsyncStorage.removeItem(STORAGE_LICENSE_EXPIRY);

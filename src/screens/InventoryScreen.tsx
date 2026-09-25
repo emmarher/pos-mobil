@@ -10,17 +10,22 @@
  *   - FAB "+" para agregar producto.
  *   - BottomNavBar (Productos/Inventario/Reportes).
  *
+ * MODO DESKTOP (prop `desktop`, WINDOWS_PLAN §5.2): sin chrome propio;
+ * "Nuevo producto" como botón en el encabezado de la lista (en lugar del
+ * FAB). El formulario se muestra como diálogo centrado en Windows.
+ *
  * FUENTE DE DATOS: GET /products + GET /categories (misma que la terminal).
  * Los datos de la BD son la fuente de verdad; si el servidor no responde
  * se muestra un mensaje de error (sin mock).
  * ────────────────────────────────────────────────────────────────────────
  */
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -34,8 +39,10 @@ import KpiCard from '../components/KpiCard';
 import StatusChip, {StockStatus} from '../components/StatusChip';
 import Fab from '../components/Fab';
 import GlassSurface from '../components/GlassSurface';
+import POSButton from '../components/POSButton';
 
 import {useTheme} from '../hooks/useTheme';
+import {useShortcut} from '../layout/useShortcut';
 import {useAuthStore} from '../stores/auth.store';
 import {Category, Product} from '../models';
 import {searchProducts, getCategories} from '../api/endpoints';
@@ -49,6 +56,8 @@ interface InventoryScreenProps {
   onAvatarPress?: () => void;
   /** Pestañas visibles por permisos (Reportes oculta para el Vendedor) */
   visibleTabs?: NavTab[];
+  /** Modo escritorio: sin chrome propio, atajos y botón "Nuevo producto". */
+  desktop?: boolean;
 }
 
 /** Deriva el status de stock (umbral min_stock; spec 3.8) */
@@ -63,6 +72,7 @@ export default function InventoryScreen({
   onTabChange,
   onAvatarPress,
   visibleTabs,
+  desktop = false,
 }: InventoryScreenProps) {
   const {colors, fonts, spacing} = useTheme();
 
@@ -79,6 +89,21 @@ export default function InventoryScreen({
   // Permiso para crear productos (el Vendedor no lo tiene → sin FAB)
   const user = useAuthStore(state => state.user);
   const canCreateProduct = user?.permissions.includes('products:create') ?? false;
+
+  // Ref del input de búsqueda para el atajo Ctrl+K (desktop)
+  const searchRef = useRef<TextInput>(null);
+
+  // Atajos de escritorio (WINDOWS_PLAN §6.3)
+  useShortcut(event => {
+    if (!desktop) {
+      return false;
+    }
+    if (event.key === 'k' && event.ctrlKey) {
+      searchRef.current?.focus();
+      return true;
+    }
+    return false;
+  });
 
   /* ── Carga: GET /products + /categories (igual que la terminal) ──── */
   const loadInventory = useCallback(async () => {
@@ -125,111 +150,153 @@ export default function InventoryScreen({
     });
   }, [products, query, activeCategory]);
 
+  /* ── Bloques reutilizables ───────────────────────────────────────── */
+
+  const header = (
+    <View style={styles.header}>
+      {/* Búsqueda + filtro avanzado */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchFlex}>
+          <SearchInput
+            placeholder="Buscar productos, SKUs…"
+            value={query}
+            onChangeText={setQuery}
+            inputRef={searchRef}
+            testID="search-inventory"
+          />
+        </View>
+        <TouchableOpacity
+          style={[styles.filterBtn, {backgroundColor: colors.surface, borderColor: colors.border}]}
+          onPress={() => console.log('Filtro avanzado')}
+          testID="btn-filter-advanced">
+          <Text style={{fontSize: 18}}>⚙</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Chips de categoría (del servidor, mismas que en Productos) */}
+      <View style={[styles.chips, {marginTop: spacing.sm}]}>
+        <FilterChip
+          label="Todos"
+          active={activeCategory === 'all'}
+          onPress={() => setActiveCategory('all')}
+          testID="inv-chip-all"
+        />
+        {categories.map(cat => (
+          <FilterChip
+            key={cat.id}
+            label={cat.name}
+            active={activeCategory === cat.id}
+            onPress={() => setActiveCategory(cat.id)}
+            testID={`inv-chip-${cat.id}`}
+          />
+        ))}
+      </View>
+
+      {/* KPIs calculados de los datos reales */}
+      <View style={[styles.kpiRow, {marginTop: spacing.md}]}>
+        <KpiCard
+          label="Total items"
+          value={kpis.totalItems}
+          trend={kpis.totalItemsTrend}
+          style={styles.kpi}
+          testID="kpi-total"
+        />
+        <KpiCard
+          label="Agotados"
+          value={kpis.outOfStock}
+          alert={Number(kpis.outOfStock) > 0}
+          style={styles.kpi}
+          testID="kpi-outofstock"
+        />
+        <KpiCard
+          label="Categorías"
+          value={kpis.categories}
+          style={styles.kpi}
+          testID="kpi-categories"
+        />
+      </View>
+    </View>
+  );
+
+  const list = (
+    <ScrollView contentContainerStyle={{padding: spacing.md, paddingBottom: desktop ? spacing.lg : 160}}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, {color: colors.text, fontSize: fonts.medium}]}>
+          Catálogo de productos
+        </Text>
+        {/* En desktop el alta es un botón del encabezado (no FAB) */}
+        {desktop && canCreateProduct && (
+          <POSButton
+            title="+ Nuevo producto"
+            onPress={() => setFormVisible(true)}
+            testID="btn-new-product-desktop"
+          />
+        )}
+      </View>
+
+      {loading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, {color: colors.textSecondary, fontSize: fonts.small}]}>
+            Cargando inventario…
+          </Text>
+        </View>
+      ) : filtered.length === 0 ? (
+        <Text style={[styles.empty, {color: colors.textSecondary, fontSize: fonts.regular}]}>
+          No hay productos para «{query}» o el servidor no está disponible
+        </Text>
+      ) : (
+        filtered.map(p => (
+          <GlassSurface key={p.id} style={styles.rowCard}>
+            <View style={[styles.thumb, {backgroundColor: colors.primarySoft}]}>
+              <Text style={[styles.thumbText, {color: colors.primary}]}>
+                {p.name.charAt(0)}
+              </Text>
+            </View>
+            <View style={styles.rowInfo}>
+              <Text numberOfLines={1} style={[styles.rowName, {color: colors.text, fontSize: fonts.regular}]}>
+                {p.name}
+              </Text>
+              <Text style={[styles.rowSku, {color: colors.textSecondary, fontSize: fonts.small}]}>
+                {p.sku ?? p.internal_code} · Stock: {p.stock}
+              </Text>
+            </View>
+            <StatusChip status={stockStatus(p)} testID={`status-${p.id}`} />
+          </GlassSurface>
+        ))
+      )}
+    </ScrollView>
+  );
+
+  const productForm = (
+    <ProductFormSheet
+      visible={formVisible}
+      onClose={() => setFormVisible(false)}
+      onCreated={loadInventory}
+    />
+  );
+
+  /* ── Modo escritorio: contenido sin chrome (AppShell lo provee) ──── */
+
+  if (desktop) {
+    return (
+      <View style={styles.desktopRoot}>
+        {header}
+        {list}
+        {productForm}
+      </View>
+    );
+  }
+
+  /* ── Modo móvil/tablet: chrome completo ───────────────────────────── */
+
   return (
     <GlassBackground>
       <TopAppBar title="Inventario" onAvatarPress={onAvatarPress} />
 
-      {/* Búsqueda + filtro avanzado */}
-      <View style={styles.header}>
-        <View style={styles.searchRow}>
-          <View style={styles.searchFlex}>
-            <SearchInput
-              placeholder="Buscar productos, SKUs…"
-              value={query}
-              onChangeText={setQuery}
-              testID="search-inventory"
-            />
-          </View>
-          <TouchableOpacity
-            style={[styles.filterBtn, {backgroundColor: colors.surface, borderColor: colors.border}]}
-            onPress={() => console.log('Filtro avanzado')}
-            testID="btn-filter-advanced">
-            <Text style={{fontSize: 18}}>⚙</Text>
-          </TouchableOpacity>
-        </View>
+      {header}
 
-        {/* Chips de categoría (del servidor, mismas que en Productos) */}
-        <View style={[styles.chips, {marginTop: spacing.sm}]}>
-          <FilterChip
-            label="Todos"
-            active={activeCategory === 'all'}
-            onPress={() => setActiveCategory('all')}
-            testID="inv-chip-all"
-          />
-          {categories.map(cat => (
-            <FilterChip
-              key={cat.id}
-              label={cat.name}
-              active={activeCategory === cat.id}
-              onPress={() => setActiveCategory(cat.id)}
-              testID={`inv-chip-${cat.id}`}
-            />
-          ))}
-        </View>
-
-        {/* KPIs calculados de los datos reales */}
-        <View style={[styles.kpiRow, {marginTop: spacing.md}]}>
-          <KpiCard
-            label="Total items"
-            value={kpis.totalItems}
-            trend={kpis.totalItemsTrend}
-            style={styles.kpi}
-            testID="kpi-total"
-          />
-          <KpiCard
-            label="Agotados"
-            value={kpis.outOfStock}
-            alert={Number(kpis.outOfStock) > 0}
-            style={styles.kpi}
-            testID="kpi-outofstock"
-          />
-          <KpiCard
-            label="Categorías"
-            value={kpis.categories}
-            style={styles.kpi}
-            testID="kpi-categories"
-          />
-        </View>
-      </View>
-
-      {/* Lista del catálogo */}
-      <ScrollView contentContainerStyle={{padding: spacing.md, paddingBottom: 160}}>
-        <Text style={[styles.sectionTitle, {color: colors.text, fontSize: fonts.medium}]}>
-          Catálogo de productos
-        </Text>
-
-        {loading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, {color: colors.textSecondary, fontSize: fonts.small}]}>
-              Cargando inventario…
-            </Text>
-          </View>
-        ) : filtered.length === 0 ? (
-          <Text style={[styles.empty, {color: colors.textSecondary, fontSize: fonts.regular}]}>
-            No hay productos para «{query}» o el servidor no está disponible
-          </Text>
-        ) : (
-          filtered.map(p => (
-            <GlassSurface key={p.id} style={styles.rowCard}>
-              <View style={[styles.thumb, {backgroundColor: colors.primarySoft}]}>
-                <Text style={[styles.thumbText, {color: colors.primary}]}>
-                  {p.name.charAt(0)}
-                </Text>
-              </View>
-              <View style={styles.rowInfo}>
-                <Text numberOfLines={1} style={[styles.rowName, {color: colors.text, fontSize: fonts.regular}]}>
-                  {p.name}
-                </Text>
-                <Text style={[styles.rowSku, {color: colors.textSecondary, fontSize: fonts.small}]}>
-                  {p.sku ?? p.internal_code} · Stock: {p.stock}
-                </Text>
-              </View>
-              <StatusChip status={stockStatus(p)} testID={`status-${p.id}`} />
-            </GlassSurface>
-          ))
-        )}
-      </ScrollView>
+      {list}
 
       {/* FAB + para agregar producto (solo con permiso products:create) */}
       {canCreateProduct && (
@@ -240,12 +307,7 @@ export default function InventoryScreen({
         />
       )}
 
-      {/* Formulario de nuevo producto */}
-      <ProductFormSheet
-        visible={formVisible}
-        onClose={() => setFormVisible(false)}
-        onCreated={loadInventory}
-      />
+      {productForm}
 
       {/* Navegación inferior (controlada por el Dashboard) */}
       <View style={styles.bottomNav}>
@@ -270,7 +332,14 @@ const styles = StyleSheet.create({
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   kpiRow: {flexDirection: 'row', gap: 8},
   kpi: {flex: 1},
-  sectionTitle: {fontWeight: '700', marginBottom: 8},
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 12,
+  },
+  sectionTitle: {fontWeight: '700'},
   rowCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,4 +362,5 @@ const styles = StyleSheet.create({
   loadingText: {marginTop: 8, fontWeight: '600'},
   empty: {textAlign: 'center', paddingTop: 32},
   bottomNav: {position: 'absolute', bottom: 0, left: 0, right: 0},
+  desktopRoot: {flex: 1},
 });

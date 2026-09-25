@@ -15,6 +15,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getUniqueId} from 'react-native-device-info';
+import {Platform} from 'react-native';
 
 /** Clave de AsyncStorage para el device_id persistido */
 const STORAGE_DEVICE_ID = 'pos.device_id';
@@ -33,6 +34,14 @@ export async function getStableDeviceId(): Promise<string> {
   const saved = await AsyncStorage.getItem(STORAGE_DEVICE_ID);
   if (saved) {
     return saved;
+  }
+
+  // Windows/macOS: react-native-device-info no devuelve un ID estable en
+  // escritorio → generar uno propio y persistirlo (RF-AU-004).
+  if (Platform.OS === 'windows' || Platform.OS === 'macos') {
+    const generated = generateDeviceId();
+    await AsyncStorage.setItem(STORAGE_DEVICE_ID, generated);
+    return generated;
   }
 
   // 2) device-info estable por instalación (emulador: puede fallar)

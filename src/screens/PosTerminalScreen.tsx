@@ -11,13 +11,19 @@
  *   - FAB carrito → CartSheet (totales, pago, confirmar POST /sales).
  *   - BottomNavBar (Productos/Inventario/Reportes).
  *
+ * MODO DESKTOP (prop `desktop`, WINDOWS_PLAN §5.2):
+ *   - Sin TopAppBar/BottomNavBar/FAB (los provee AppShell).
+ *   - Grid reactivo: columnas según breakpoint.
+ *   - Carrito como CartPanel (panel derecho) en lugar de sheet.
+ *   - Atajos: Ctrl+K → búsqueda; Ctrl+Space → alternar carrito.
+ *
  * CARGA DE DATOS: se intenta GET /products + GET /categories al montar.
  * Si el servidor no responde, cae a MOCK_PRODUCTS/MOCK_CATEGORIES para
  * que la UI no se rompa (el servidor es la fuente de verdad).
  * ────────────────────────────────────────────────────────────────────────
  */
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, FlatList, StyleSheet, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View} from 'react-native';
 
 import GlassBackground from '../components/GlassBackground';
 import TopAppBar from '../components/TopAppBar';
@@ -28,8 +34,12 @@ import ProductCard from '../components/ProductCard';
 import Fab from '../components/Fab';
 import ProductSheet from '../components/ProductSheet';
 import CartSheet from '../components/CartSheet';
+import CartPanel from '../components/CartPanel';
 
 import {useTheme} from '../hooks/useTheme';
+import {useWindowBreakpoint} from '../layout/useWindowBreakpoint';
+import {useShortcut} from '../layout/useShortcut';
+import {getGridColumns} from '../layout/Breakpoints';
 import {MOCK_CATEGORIES, MOCK_PRODUCTS} from '../constants/mock-data';
 import {Category, PriceType, Product} from '../models';
 import {searchProducts, getCategories, getPriceTypes} from '../api/endpoints';
@@ -44,6 +54,8 @@ interface PosTerminalScreenProps {
   onAvatarPress?: () => void;
   /** Pestañas visibles por permisos (Reportes oculta para el Vendedor) */
   visibleTabs?: NavTab[];
+  /** Modo escritorio: sin chrome propio, grid reactivo + CartPanel. */
+  desktop?: boolean;
 }
 
 export default function PosTerminalScreen({
@@ -51,8 +63,10 @@ export default function PosTerminalScreen({
   onTabChange,
   onAvatarPress,
   visibleTabs,
+  desktop = false,
 }: PosTerminalScreenProps) {
   const {colors, fonts, spacing} = useTheme();
+  const breakpoint = useWindowBreakpoint();
 
   /* ── Estado local ─────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
@@ -60,8 +74,9 @@ export default function PosTerminalScreen({
 
   // Producto seleccionado para el sheet de cantidad (null = cerrado)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  // Carrito visible
+  // Carrito visible (móvil: sheet; desktop: panel derecho)
   const [cartVisible, setCartVisible] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   // Datos: productos y categorías (reales o fallback mock)
   const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
@@ -73,6 +88,28 @@ export default function PosTerminalScreen({
   const cartCount = useCartStore(state => state.items.length);
   // Usuario: si cambia (login nuevo/restauración), recargar catálogo
   const user = useAuthStore(state => state.user);
+
+  // Ref del input de búsqueda para el atajo Ctrl+K (desktop)
+  const searchRef = useRef<TextInput>(null);
+
+  // Columnas del catálogo: fijo (4) en móvil, reactivo en desktop
+  const numColumns = desktop ? getGridColumns(breakpoint) : 4;
+
+  // Atajos de escritorio (WINDOWS_PLAN §6.3)
+  useShortcut(event => {
+    if (!desktop) {
+      return false;
+    }
+    if (event.key === 'k' && event.ctrlKey) {
+      searchRef.current?.focus();
+      return true;
+    }
+    if (event.key === ' ' && event.ctrlKey) {
+      setCartOpen(open => !open);
+      return true;
+    }
+    return false;
+  });
 
   /* ── Carga inicial: GET /products + /categories + /price-types ───── */
   const loadCatalog = useCallback(async () => {
@@ -116,64 +153,91 @@ export default function PosTerminalScreen({
     });
   }, [products, query, activeCategory]);
 
+  /* ── Bloques reutilizables (header + catálogo) ───────────────────── */
+
+  const header = (
+    <View style={styles.header}>
+      <SearchInput
+        placeholder="Buscar productos…"
+        value={query}
+        onChangeText={setQuery}
+        inputRef={searchRef}
+        testID="search-products"
+      />
+      <View style={[styles.chips, {marginTop: spacing.sm}]}>
+        {categories.map(cat => (
+          <FilterChip
+            key={cat.id}
+            label={cat.name}
+            active={activeCategory === cat.id}
+            onPress={() => setActiveCategory(cat.id)}
+            testID={`chip-${cat.id}`}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  const catalog = loading ? (
+    <View style={styles.loading}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={[styles.loadingText, {color: colors.textSecondary, fontSize: fonts.small}]}>
+        Cargando productos…
+      </Text>
+    </View>
+  ) : (
+    <FlatList
+      data={filtered}
+      keyExtractor={item => item.id}
+      numColumns={numColumns}
+      columnWrapperStyle={styles.row}
+      contentContainerStyle={
+        desktop
+          ? {padding: spacing.md, paddingBottom: spacing.lg}
+          : {padding: spacing.md, paddingBottom: 160}
+      }
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Text style={[styles.emptyText, {color: colors.textSecondary, fontSize: fonts.regular}]}>
+            No hay productos para "«{query}»"
+          </Text>
+        </View>
+      }
+      renderItem={({item}) => (
+        <View style={styles.cell}>
+          <ProductCard
+            product={item}
+            onPress={() => setSelectedProduct(item)}
+            testID={`product-${item.id}`}
+          />
+        </View>
+      )}
+    />
+  );
+
+  /* ── Modo escritorio: contenido + panel de carrito ────────────────── */
+
+  if (desktop) {
+    return (
+      <View style={styles.desktopRow}>
+        <View style={styles.desktopMain}>
+          {header}
+          {catalog}
+        </View>
+        <CartPanel visible={cartOpen} onClose={() => setCartOpen(false)} />
+      </View>
+    );
+  }
+
+  /* ── Modo móvil/tablet: chrome completo ───────────────────────────── */
+
   return (
     <GlassBackground>
       <TopAppBar title="Terminal de ventas" onAvatarPress={onAvatarPress} />
 
-      {/* Búsqueda + categorías */}
-      <View style={styles.header}>
-        <SearchInput
-          placeholder="Buscar productos…"
-          value={query}
-          onChangeText={setQuery}
-          testID="search-products"
-        />
-        <View style={[styles.chips, {marginTop: spacing.sm}]}>
-          {categories.map(cat => (
-            <FilterChip
-              key={cat.id}
-              label={cat.name}
-              active={activeCategory === cat.id}
-              onPress={() => setActiveCategory(cat.id)}
-              testID={`chip-${cat.id}`}
-            />
-          ))}
-        </View>
-      </View>
+      {header}
 
-      {/* Catálogo en grid */}
-      {loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, {color: colors.textSecondary, fontSize: fonts.small}]}>
-            Cargando productos…
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={item => item.id}
-          numColumns={4}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={{padding: spacing.md, paddingBottom: 160}}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={[styles.emptyText, {color: colors.textSecondary, fontSize: fonts.regular}]}>
-                No hay productos para "«{query}»"
-              </Text>
-            </View>
-          }
-          renderItem={({item}) => (
-            <View style={styles.cell}>
-              <ProductCard
-                product={item}
-                onPress={() => setSelectedProduct(item)}
-                testID={`product-${item.id}`}
-              />
-            </View>
-          )}
-        />
-      )}
+      {catalog}
 
       {/* Sheet de cantidad al tocar un producto */}
       <ProductSheet
@@ -215,4 +279,7 @@ const styles = StyleSheet.create({
   loading: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   loadingText: {marginTop: 8, fontWeight: '600'},
   bottomNav: {position: 'absolute', bottom: 0, left: 0, right: 0},
+  // Desktop (WINDOWS_PLAN §5.2)
+  desktopRow: {flex: 1, flexDirection: 'row'},
+  desktopMain: {flex: 1},
 });

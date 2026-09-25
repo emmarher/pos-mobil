@@ -36,6 +36,7 @@ import {
 } from '../api/endpoints';
 import {ApiError} from '../api/client';
 import POSButton from './POSButton';
+import DesktopDialog from './DesktopDialog';
 
 interface ProductFormSheetProps {
   visible: boolean;
@@ -172,23 +173,14 @@ export default function ProductFormSheet({
 
   const selectedSaleUnit = units.find(u => u.id === saleUnitId);
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
-      </TouchableWithoutFeedback>
+  // Cuerpo compartido entre la hoja móvil y el diálogo de escritorio
+  const body = (
+    <>
+      <Text style={[styles.title, {color: colors.text, fontSize: fonts.medium}]}>
+        Nuevo producto
+      </Text>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.sheet, {backgroundColor: colors.surfaceSolid}]}>
-          {/* Manija */}
-          <View style={[styles.handle, {backgroundColor: colors.border}]} />
-
-          <Text style={[styles.title, {color: colors.text, fontSize: fonts.medium}]}>
-            Nuevo producto
-          </Text>
-
-          <ScrollView contentContainerStyle={{paddingBottom: 16}}>
+      <ScrollView contentContainerStyle={{paddingBottom: 16}}>
             {/* Nombre */}
             <Text style={[styles.label, {color: colors.textSecondary, fontSize: fonts.small}]}>
               Nombre *
@@ -406,7 +398,36 @@ export default function ProductFormSheet({
               style={{marginTop: spacing.sm}}
               testID="pf-cancel"
             />
-          </ScrollView>
+        </ScrollView>
+    </>
+  );
+
+  // Escritorio: diálogo centrado con fade (WINDOWS_PLAN §5.2)
+  if (Platform.OS === 'windows' || Platform.OS === 'macos') {
+    return (
+      <DesktopDialog
+        visible={visible}
+        onClose={onClose}
+        maxWidth={560}
+        onEnter={handleSubmit}>
+        {body}
+      </DesktopDialog>
+    );
+  }
+
+  // Móvil/tablet: hoja inferior (spec 3.x)
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.backdrop} />
+      </TouchableWithoutFeedback>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.sheet, {backgroundColor: colors.surfaceSolid}]}>
+          {/* Manija */}
+          <View style={[styles.handle, {backgroundColor: colors.border}]} />
+          {body}
         </View>
       </KeyboardAvoidingView>
     </Modal>
